@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-labelledby="title desc">
+  <title id="title">Logo W</title>
+  <desc id="desc">Logo con una W verde y tres flechas amarillas hacia arriba.</desc>
+  <rect width="400" height="400" fill="#e8e8e8" />
+
+  <g fill="#f1ea17">
+    <polygon points="90,170 140,95 190,170 160,170 160,255 120,255 120,170" />
+    <polygon points="210,170 260,95 310,170 280,170 280,255 240,255 240,170" />
+    <path d="M197 92c0-14 11-26 25-26s25 12 25 26h-12c0-8-6-14-13-14s-13 6-13 14z" />
+  </g>
+
+  <g fill="none" stroke="#2f9640" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M34 70 L114 334 L200 78 L286 334 L366 70" stroke-width="30" />
+  </g>
+</svg>

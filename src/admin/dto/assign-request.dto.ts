@@ -1,0 +1,17 @@
+import { IsISO8601, IsOptional, IsString, MaxLength } from 'class-validator';
+
+export class AssignRequestDto {
+  @IsString()
+  userId!: string;
+
+  @IsISO8601()
+  startAt!: string;
+
+  @IsISO8601()
+  endAt!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  comment?: string;
+}

@@ -1,0 +1,1338 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fichar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo-3d logo-3d-sm">
+        <div class="logo-3d-depth"></div>
+        <img class="logo-3d-face" src="/logo-w.svg" alt="Logo empresa" />
+      </div>
+      <div>
+        <p class="eyebrow">Control horario</p>
+        <h1>Panel de Fichaje</h1>
+      </div>
+    </div>
+    <div class="user-box" id="userBox" hidden>
+      <span id="userName">-</span>
+      <span class="role-pill" id="rolePill">-</span>
+      <button class="btn ghost" id="logoutBtn">Salir</button>
+    </div>
+  </header>
+
+  <div id="flash" class="flash-stack" hidden aria-live="polite" aria-atomic="false"></div>
+
+  <main>
+    <section class="card auth-card" id="authView">
+      <div class="auth-logo-wrap">
+        <div class="logo-3d logo-3d-lg">
+          <div class="logo-3d-depth"></div>
+          <img class="logo-3d-face" src="/logo-w.svg" alt="Logo empresa" />
+        </div>
+      </div>
+      <h2>Iniciar sesión</h2>
+      <p class="muted">Accede con tu cuenta. El sistema detecta la ubicación automáticamente al fichar.</p>
+
+      <label class="field">
+        Email
+        <input id="emailInput" type="email" placeholder="usuario@empresa.com" />
+      </label>
+
+      <label class="field">
+        Contraseña
+        <input id="passwordInput" type="password" placeholder="••••••••" />
+      </label>
+
+      <div class="row">
+        <button class="btn" id="loginBtn">Entrar</button>
+        <button class="btn ghost" id="forgotPasswordBtn">He olvidado mi contraseña</button>
+      </div>
+
+      <h3 style="margin: 18px 0 6px;">Primer acceso de empresa</h3>
+      <p class="muted tiny" style="margin-top: 0;">
+        Si tu empresa es nueva, activa el acceso con el código recibido y crea la primera cuenta administradora.
+      </p>
+
+      <div id="selfRegisterDisabledNote" hidden>
+        <p class="muted tiny" style="margin-top: 0;">
+          El registro directo sin código está deshabilitado. El alta inicial se realiza con un código de activación de un solo uso.
+        </p>
+      </div>
+
+      <h3 style="margin: 14px 0 6px;">Activar empresa</h3>
+      <p class="muted tiny" style="margin-top: 0;">
+        Usa el código de activación de un solo uso que se entrega tras validar el alta de la empresa.
+      </p>
+      <div class="grid two">
+        <label class="field">
+          Clave de activación
+          <input id="activationKeyInput" type="text" placeholder="ACT-XXXX-XXXX-XXXX" />
+        </label>
+        <label class="field">
+          Email del administrador
+          <input id="activationEmailInput" type="email" placeholder="admin@empresa.com" required />
+        </label>
+      </div>
+      <label class="field">
+        Nombre administrador
+        <input id="activationNameInput" type="text" placeholder="Nombre y apellidos" required />
+      </label>
+      <div id="activateAdminCaptchaWrap" class="captcha-wrap" hidden>
+        <p class="muted tiny captcha-help">Verificación anti-bots</p>
+        <div id="activateAdminCaptcha"></div>
+      </div>
+      <button class="btn ghost" id="activateAdminBtn">Activar empresa</button>
+
+      <div id="selfRegisterSection">
+        <h3 style="margin: 14px 0 6px;">Registro directo de empresa</h3>
+        <p class="muted tiny" style="margin-top: 0;">
+          Este bloque solo debe habilitarse si quieres permitir altas públicas directas.
+        </p>
+        <div class="grid two">
+          <label class="field">
+            CIF empresa
+            <input id="selfRegisterCompanyCifInput" type="text" placeholder="B12345678" pattern="[A-Za-z]\d{7}[0-9A-Za-z]" title="Formato esperado: B12345678" required />
+          </label>
+          <label class="field">
+            Nombre empresa
+            <input id="selfRegisterCompanyNameInput" type="text" placeholder="Acme S.L." required />
+          </label>
+        </div>
+        <div class="grid two">
+          <label class="field">
+            Email administrador
+            <input id="selfRegisterAdminEmailInput" type="email" placeholder="admin@empresa.com" required />
+          </label>
+          <label class="field">
+            Nombre administrador
+            <input id="selfRegisterAdminNameInput" type="text" placeholder="Nombre y apellidos" required />
+          </label>
+        </div>
+        <label class="field">
+          Logo URL (opcional)
+          <input id="selfRegisterCompanyLogoInput" type="url" placeholder="https://..." />
+        </label>
+        <div id="selfRegisterCaptchaWrap" class="captcha-wrap" hidden>
+          <p class="muted tiny captcha-help">Verificación anti-bots</p>
+          <div id="selfRegisterCaptcha"></div>
+        </div>
+        <button class="btn ghost" id="selfRegisterCompanyBtn">Registrar empresa y administrador</button>
+      </div>
+
+      <details class="advanced" id="devToolsSection" hidden>
+        <summary>Opciones técnicas</summary>
+        <label class="field">
+          Firebase API Key
+          <input id="apiKeyInput" type="text" placeholder="AIza..." />
+        </label>
+
+        <div class="grid two">
+          <label class="field">
+            Demo empleado - email
+            <input id="demoEmployeeEmailInput" type="email" placeholder="empleado@empresa.com" />
+          </label>
+          <label class="field">
+            Demo empleado - contraseña
+            <input id="demoEmployeePasswordInput" type="password" placeholder="••••••••" />
+          </label>
+        </div>
+
+        <div class="grid two">
+          <label class="field">
+            Demo admin - email
+            <input id="demoAdminEmailInput" type="email" placeholder="admin@empresa.com" />
+          </label>
+          <label class="field">
+            Demo admin - contraseña
+            <input id="demoAdminPasswordInput" type="password" placeholder="••••••••" />
+          </label>
+        </div>
+
+        <div class="row">
+          <button class="btn ghost" id="saveAdvancedBtn">Guardar configuración</button>
+          <button class="btn ghost" id="demoEmployeeBtn">Entrar demo empleado</button>
+          <button class="btn ghost" id="demoAdminBtn">Entrar demo admin</button>
+        </div>
+
+        <label class="field">
+          ID Token
+          <textarea id="tokenInput" rows="3" placeholder="Pega aquí el token"></textarea>
+        </label>
+        <button class="btn ghost" id="saveTokenBtn">Entrar con token</button>
+      </details>
+    </section>
+
+    <section id="appView" hidden>
+      <section class="card app-nav">
+        <div class="row tight nav-actions">
+          <button class="btn ghost nav-page-btn" data-page-nav="inicio">Inicio</button>
+          <button class="btn ghost nav-page-btn" data-page-nav="solicitudes">Solicitudes</button>
+          <button class="btn ghost nav-page-btn" data-page-nav="progreso">Progreso</button>
+          <button class="btn ghost nav-page-btn" data-page-nav="cuadrante">Cuadrante</button>
+          <button class="btn ghost nav-page-btn" data-page-nav="documentos">Documentos</button>
+          <button class="btn ghost nav-page-btn" data-page-nav="perfil">Perfil</button>
+          <button class="btn ghost nav-page-btn" data-page-nav="admin" id="navAdminBtn" hidden>Admin</button>
+        </div>
+        <label class="field nav-select">
+          Sección
+          <select id="pageSelect">
+            <option value="inicio">Inicio</option>
+            <option value="solicitudes">Solicitudes</option>
+            <option value="progreso">Progreso</option>
+            <option value="cuadrante">Cuadrante</option>
+            <option value="documentos">Documentos</option>
+            <option value="perfil">Perfil</option>
+            <option value="admin" id="pageAdminOption" hidden>Administración</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="app-page" data-page="inicio">
+      <div class="grid two">
+        <section class="card">
+          <div class="card-head">
+            <h2>Fichaje</h2>
+            <span id="shiftBadge" class="badge">Sin datos</span>
+          </div>
+          <p class="work-timer" id="workTimer">00:00:00</p>
+          <p class="muted tiny" id="workTimerLabel">No hay turno activo.</p>
+          <p class="muted" id="geoNote">La ubicación se detecta automáticamente al fichar.</p>
+          <p class="muted" id="shiftDetail">-</p>
+
+          <div class="row">
+            <button class="btn" id="clockInBtn">Fichar entrada</button>
+            <button class="btn danger" id="clockOutBtn">Fichar salida</button>
+            <button class="btn ghost" id="refreshShiftBtn">Actualizar</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Nueva solicitud</h2>
+          <div class="grid three">
+            <label class="field">
+              Tipo
+              <select id="requestType">
+                <option value="VACATION">Vacaciones</option>
+                <option value="DAY_OFF">Día libre</option>
+                <option value="OVERTIME">Horas extra</option>
+                <option value="CORRECTION">Corrección</option>
+              </select>
+            </label>
+            <label class="field">
+              Inicio
+              <input id="requestStart" type="datetime-local" />
+            </label>
+            <label class="field">
+              Fin
+              <input id="requestEnd" type="datetime-local" />
+            </label>
+          </div>
+          <label class="field">
+            Comentario
+            <input id="requestComment" type="text" placeholder="Opcional" />
+          </label>
+
+          <div class="row">
+            <button class="btn" id="createRequestBtn">Enviar solicitud</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Últimos fichajes</h2>
+          <button class="btn ghost" id="refreshShiftHistoryBtn">Recargar historial</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Entrada</th>
+                <th>Salida</th>
+                <th>Centro</th>
+                <th>Ubicación</th>
+                <th>Duración</th>
+                <th>Estado</th>
+                <th>Mapa</th>
+              </tr>
+            </thead>
+            <tbody id="shiftHistoryBody"></tbody>
+          </table>
+        </div>
+      </section>
+      </section>
+
+      <section class="card app-page" data-page="solicitudes">
+        <div class="card-head">
+          <h2>Mis solicitudes</h2>
+          <div class="row tight">
+            <select id="filterStatus">
+              <option value="">Estado: todos</option>
+              <option value="PENDING">Pendiente</option>
+              <option value="APPROVED">Aprobada</option>
+              <option value="REJECTED">Rechazada</option>
+              <option value="CANCELLED">Cancelada</option>
+            </select>
+            <select id="filterType">
+              <option value="">Tipo: todos</option>
+              <option value="VACATION">Vacaciones</option>
+              <option value="SICK_LEAVE">Baja</option>
+              <option value="DAY_OFF">Día libre</option>
+              <option value="OVERTIME">Horas extra</option>
+              <option value="CORRECTION">Corrección</option>
+            </select>
+            <button class="btn ghost" id="refreshRequestsBtn">Recargar</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Periodo</th>
+                <th>Comentario</th>
+                <th>Revisión admin</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="requestsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card app-page" data-page="progreso">
+        <div class="card-head">
+          <h2>Progreso y alertas</h2>
+          <div class="row tight">
+            <button class="btn ghost" id="refreshProgressBtn">Actualizar progreso</button>
+            <button class="btn ghost" id="refreshNotificationsBtn">Actualizar alertas</button>
+          </div>
+        </div>
+
+        <div class="grid four">
+          <article class="stat-card">
+            <p>Grupo</p>
+            <strong id="progressGroup">-</strong>
+          </article>
+          <article class="stat-card">
+            <p>Horas prácticas</p>
+            <strong id="progressInternship">-</strong>
+          </article>
+          <article class="stat-card">
+            <p>Semana actual</p>
+            <strong id="progressWeekly">-</strong>
+          </article>
+          <article class="stat-card">
+            <p>Vacaciones</p>
+            <strong id="progressVacation">-</strong>
+          </article>
+          <article class="stat-card">
+            <p>Bolsa de horas</p>
+            <strong id="progressOvertimeBank">-</strong>
+          </article>
+        </div>
+
+        <p class="muted" id="progressSummary">Sin datos de progreso.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Estado</th>
+                <th>Aviso</th>
+                <th>Fecha</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="notificationsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card app-page" data-page="cuadrante">
+        <div class="card-head">
+          <h2>Mi cuadrante mensual</h2>
+          <div class="row tight month-nav">
+            <button class="btn ghost" id="schedulePrevMonthBtn" type="button" aria-label="Mes anterior">◀</button>
+            <strong id="scheduleMonthLabel">-</strong>
+            <button class="btn ghost" id="scheduleNextMonthBtn" type="button" aria-label="Mes siguiente">▶</button>
+            <input id="scheduleMonthInput" type="month" hidden />
+            <button class="btn ghost" id="refreshScheduleBtn">Actualizar cuadrante</button>
+          </div>
+        </div>
+
+        <p class="muted">
+          Aquí puedes ver tu planificación del mes: trabajo, vacaciones, baja, día libre o festivo.
+        </p>
+
+        <div class="card" style="margin-top: 12px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Marcar baja médica</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            La baja médica se registra directamente en tu cuadrante. No hace falta crear una solicitud.
+          </p>
+          <p class="muted tiny" id="scheduleSelectedDateLabel">Selecciona un día del calendario o indica el rango.</p>
+          <div class="grid three">
+            <label class="field">
+              Desde
+              <input id="mySickLeaveFromInput" type="date" />
+            </label>
+            <label class="field">
+              Hasta
+              <input id="mySickLeaveToInput" type="date" />
+            </label>
+            <label class="field">
+              Observaciones
+              <input id="mySickLeaveNotesInput" type="text" placeholder="Parte médico u observación" />
+            </label>
+          </div>
+          <div class="row">
+            <button class="btn" id="markMySickLeaveBtn">Marcar baja médica</button>
+          </div>
+        </div>
+
+        <div id="scheduleCalendar" class="schedule-calendar"></div>
+      </section>
+
+      <section class="card app-page" data-page="documentos">
+        <div class="card-head">
+          <h2>Documentos</h2>
+          <button class="btn ghost" id="refreshDocsBtn">Recargar</button>
+        </div>
+
+        <div class="grid three">
+          <label class="field">
+            Desde
+            <input id="docFrom" type="date" />
+          </label>
+          <label class="field">
+            Hasta
+            <input id="docTo" type="date" />
+          </label>
+          <label class="field">
+            Zona horaria
+            <input id="docTimezone" type="text" />
+          </label>
+        </div>
+
+        <div class="row">
+          <button class="btn" id="createDocBtn">Crear documento</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Estado</th>
+                <th>Periodo</th>
+                <th>Hash</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="docsBody"></tbody>
+          </table>
+        </div>
+
+        <div class="signature-box">
+          <p class="muted">Documento seleccionado para firma: <strong id="selectedDocLabel">ninguno</strong></p>
+          <canvas id="signatureCanvas"></canvas>
+          <p class="muted tiny">Dibuja la firma dentro del recuadro. Se insertará en el PDF final firmado.</p>
+          <img id="signaturePreview" class="signature-preview" alt="Vista previa de firma" hidden />
+          <div class="row">
+            <button class="btn ghost" id="clearSignBtn">Limpiar firma</button>
+            <button class="btn" id="signDocBtn">Firmar documento</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card app-page" data-page="perfil">
+        <div class="card-head">
+          <h2>Mi perfil</h2>
+          <button class="btn ghost" id="refreshProfileBtn">Recargar perfil</button>
+        </div>
+
+        <p class="muted">Actualiza tus datos personales y de contacto.</p>
+
+        <div class="grid two">
+          <label class="field">
+            Nombre y apellidos
+            <input id="profileNameInput" type="text" placeholder="Nombre y apellidos" />
+          </label>
+          <label class="field">
+            Correo
+            <input id="profileEmailInput" type="email" placeholder="usuario@empresa.com" />
+          </label>
+        </div>
+
+        <div class="grid two">
+          <label class="field">
+            Teléfono
+            <input id="profilePhoneInput" type="text" placeholder="+34 600 000 000" />
+          </label>
+          <label class="field">
+            Fecha de nacimiento
+            <input id="profileBirthDateInput" type="date" />
+          </label>
+        </div>
+
+        <div class="row">
+          <button class="btn" id="saveProfileBtn">Guardar perfil</button>
+          <button class="btn danger" id="deleteMyAccountBtn">Eliminar mi cuenta</button>
+        </div>
+      </section>
+
+      <section class="card app-page" id="adminSection" data-page="admin" hidden>
+        <div class="card-head">
+          <h2>Panel administrador</h2>
+          <div class="row tight">
+            <button class="btn ghost" id="adminHomeBtn" hidden>Índice admin</button>
+            <button class="btn ghost" id="refreshAdminBtn">Actualizar</button>
+          </div>
+        </div>
+
+        <p class="muted admin-lead" id="adminLeadText">
+          Accede a cada bloque desde un panel más claro. Al pulsar una tarjeta entrarás directamente en la subpágina de esa herramienta.
+        </p>
+
+        <div class="admin-subpage-title" id="adminSubpageTitle" hidden>
+          <p class="eyebrow">Administración</p>
+          <h3 id="adminSubpageHeading">-</h3>
+          <p class="muted tiny" id="adminSubpageDescription">-</p>
+        </div>
+
+        <div class="admin-home-grid" id="adminHomeGrid">
+          <button class="admin-hub-card" type="button" data-admin-view-target="resumen">
+            <span class="eyebrow">Resumen</span>
+            <strong>Indicadores</strong>
+            <p>Horas, ausencias, solicitudes y situación general.</p>
+          </button>
+          <button class="admin-hub-card" type="button" data-admin-view-target="operaciones">
+            <span class="eyebrow">Operaciones</span>
+            <strong>Backups y exportes</strong>
+            <p>Copias de seguridad, correo de prueba, PDF y Excel.</p>
+          </button>
+          <button class="admin-hub-card" type="button" data-admin-view-target="festivos">
+            <span class="eyebrow">Calendario</span>
+            <strong>Festivos</strong>
+            <p>Ubicación administrativa e importación oficial de festivos.</p>
+          </button>
+          <button class="admin-hub-card" type="button" data-admin-view-target="cuadrante">
+            <span class="eyebrow">Planificación</span>
+            <strong>Cuadrante</strong>
+            <p>Turnos, plantillas, copias de mes a mes y asignaciones.</p>
+          </button>
+          <button class="admin-hub-card" type="button" data-admin-view-target="geolocalizacion">
+            <span class="eyebrow">Geolocalización</span>
+            <strong>Centros y fraude</strong>
+            <p>Centros de trabajo y revisión de fichajes sospechosos.</p>
+          </button>
+          <button class="admin-hub-card" type="button" data-admin-view-target="fichajes">
+            <span class="eyebrow">Seguimiento</span>
+            <strong>Fichajes del día</strong>
+            <p>Estado actual e historial diario del personal.</p>
+          </button>
+          <button class="admin-hub-card" type="button" data-admin-view-target="solicitudes">
+            <span class="eyebrow">Solicitudes</span>
+            <strong>Revisión</strong>
+            <p>Vacaciones, horas extra y correcciones pendientes.</p>
+          </button>
+          <button class="admin-hub-card" type="button" data-admin-view-target="personal">
+            <span class="eyebrow">RRHH</span>
+            <strong>Personal</strong>
+            <p>Altas, roles, grupos, vacaciones y accesos.</p>
+          </button>
+          <button class="admin-hub-card" type="button" data-admin-view-target="onboarding">
+            <span class="eyebrow">Onboarding</span>
+            <strong>Alta de empresas</strong>
+            <p>Claves de activación para nuevos administradores y empresas.</p>
+          </button>
+          <button class="admin-hub-card" type="button" data-admin-view-target="auditoria">
+            <span class="eyebrow">Control</span>
+            <strong>Auditoría</strong>
+            <p>Registro de cambios y trazabilidad administrativa.</p>
+          </button>
+        </div>
+
+        <div class="grid four stats" id="dashboardStats">
+          <article>
+            <p>Empleados</p>
+            <strong id="statEmployees">0</strong>
+          </article>
+          <article>
+            <p>Becarios</p>
+            <strong id="statInterns">0</strong>
+          </article>
+          <article>
+            <p>Horas semana</p>
+            <strong id="statHours">0</strong>
+          </article>
+          <article>
+            <p>Solicitudes pendientes</p>
+            <strong id="statPending">0</strong>
+          </article>
+          <article>
+            <p>Turnos abiertos</p>
+            <strong id="statOpenShifts">0</strong>
+          </article>
+          <article>
+            <p>Vacaciones pendientes</p>
+            <strong id="statPendingVacations">0</strong>
+          </article>
+          <article>
+            <p>Horas extra pendientes</p>
+            <strong id="statPendingOvertime">0</strong>
+          </article>
+          <article>
+            <p>Fichajes sospechosos</p>
+            <strong id="statSuspiciousWeek">0</strong>
+          </article>
+          <article>
+            <p>Ausencias hoy</p>
+            <strong id="statAbsencesToday">0</strong>
+          </article>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Copias de seguridad</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Puedes lanzar un backup manual y el sistema genera otro automático cada 24 horas.
+          </p>
+          <div class="grid three">
+            <article class="stat-card">
+              <p>Último backup</p>
+              <strong id="backupLastLabel">-</strong>
+            </article>
+            <article class="stat-card">
+              <p>Próximo automático</p>
+              <strong id="backupNextLabel">-</strong>
+            </article>
+            <article class="stat-card">
+              <p>Estado</p>
+              <strong id="backupStatusLabel">-</strong>
+            </article>
+          </div>
+          <div class="row">
+            <button class="btn" id="runBackupNowBtn">Crear backup ahora</button>
+            <button class="btn ghost" id="refreshBackupStatusBtn">Actualizar estado backup</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Correo de prueba</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Úsalo para comprobar que el envío SMTP funciona antes de usar notificaciones reales.
+          </p>
+          <div class="grid two">
+            <label class="field">
+              Destinatario
+              <input id="testEmailRecipientInput" type="email" placeholder="admin@empresa.com" />
+            </label>
+          </div>
+          <div class="row">
+            <button class="btn" id="sendTestEmailBtn">Enviar correo de prueba</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Exportación Excel empresa</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Descarga el Excel global de la empresa para el rango de fechas seleccionado.
+          </p>
+          <div class="grid two">
+            <label class="field">
+              Desde
+              <input id="adminExportFromInput" type="date" />
+            </label>
+            <label class="field">
+              Hasta
+              <input id="adminExportToInput" type="date" />
+            </label>
+          </div>
+          <div class="row">
+            <button class="btn" id="exportCompanyExcelBtn">Exportar Excel</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">PDF individual de empleado</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Genera un PDF con los fichajes de una persona concreta, incluyendo centro y ubicación de cada turno.
+          </p>
+          <div class="grid three">
+            <label class="field">
+              Persona
+              <select id="adminPdfUserSelect">
+                <option value="">Selecciona una persona</option>
+              </select>
+            </label>
+            <label class="field">
+              Desde
+              <input id="adminPdfFromInput" type="date" />
+            </label>
+            <label class="field">
+              Hasta
+              <input id="adminPdfToInput" type="date" />
+            </label>
+          </div>
+          <div class="row">
+            <button class="btn" id="exportEmployeePdfBtn">Exportar PDF</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Ubicación administrativa y festivos</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Define la ubicación base de la empresa para preparar festivos por municipio y registra festivos propios o locales.
+          </p>
+          <div class="grid three">
+            <label class="field">
+              País
+              <input id="companyCountryInput" type="text" placeholder="España" />
+            </label>
+            <label class="field">
+              Comunidad / región
+              <input id="companyRegionInput" type="text" placeholder="Comunidad de Madrid" />
+            </label>
+            <label class="field">
+              Provincia
+              <input id="companyProvinceInput" type="text" placeholder="Madrid" />
+            </label>
+          </div>
+          <div class="grid two">
+            <label class="field">
+              Municipio
+              <input id="companyMunicipalityInput" type="text" placeholder="Aranjuez" />
+            </label>
+            <label class="field">
+              Código postal
+              <input id="companyPostalCodeInput" type="text" placeholder="28300" />
+            </label>
+          </div>
+          <div class="row">
+            <button class="btn" id="saveCompanyLocationBtn">Guardar ubicación empresa</button>
+            <button class="btn ghost" id="refreshCompanyLocationBtn">Recargar ubicación</button>
+          </div>
+
+          <div class="grid two" style="margin-top: 14px;">
+            <label class="field">
+              Año importación oficial
+              <input id="holidayImportYearInput" type="number" min="2024" max="2100" placeholder="2026" />
+            </label>
+            <label class="field">
+              Importación automática
+              <button class="btn" id="importOfficialHolidaysBtn" type="button">Importar festivos oficiales</button>
+            </label>
+          </div>
+          <p class="muted tiny" style="margin-top: 8px;">
+            Usa el municipio de la empresa y descarga los festivos oficiales de la Comunidad de Madrid para el año indicado.
+          </p>
+
+          <hr style="margin: 18px 0; border: 0; border-top: 1px solid var(--line);" />
+
+          <div class="grid three">
+            <label class="field">
+              Fecha
+              <input id="holidayDateInput" type="date" />
+            </label>
+            <label class="field">
+              Nombre festivo
+              <input id="holidayNameInput" type="text" placeholder="San Isidro" />
+            </label>
+            <label class="field">
+              Ámbito
+              <select id="holidayScopeSelect">
+                <option value="COMPANY">Empresa</option>
+                <option value="LOCAL">Local</option>
+                <option value="PROVINCIAL">Provincial</option>
+                <option value="REGIONAL">Autonómico</option>
+                <option value="NATIONAL">Nacional</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid four">
+            <label class="field">
+              País
+              <input id="holidayCountryInput" type="text" placeholder="Usa la ubicación empresa si lo dejas vacío" />
+            </label>
+            <label class="field">
+              Región
+              <input id="holidayRegionInput" type="text" placeholder="Opcional" />
+            </label>
+            <label class="field">
+              Provincia
+              <input id="holidayProvinceInput" type="text" placeholder="Opcional" />
+            </label>
+            <label class="field">
+              Municipio
+              <input id="holidayMunicipalityInput" type="text" placeholder="Opcional" />
+            </label>
+          </div>
+          <label class="field">
+            Notas
+            <input id="holidayNotesInput" type="text" placeholder="Observaciones opcionales" />
+          </label>
+          <div class="row">
+            <button class="btn" id="saveHolidayBtn">Guardar festivo</button>
+            <button class="btn ghost" id="cancelHolidayBtn">Limpiar formulario</button>
+            <button class="btn ghost" id="refreshHolidaysBtn">Actualizar festivos</button>
+          </div>
+
+          <div class="table-wrap" style="margin-top: 14px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Nombre</th>
+                  <th>Ámbito</th>
+                  <th>Ubicación</th>
+                  <th>Notas</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="holidaysBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Cuadrante mensual del personal</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Busca una persona por nombre, apellidos o email. Puedes aplicar un patrón al mes completo y ajustar días concretos pulsando el calendario.
+          </p>
+          <div class="grid four">
+            <label class="field">
+              Buscar persona
+              <input
+                id="adminScheduleUserSearchInput"
+                type="search"
+                autocomplete="off"
+                placeholder="Nombre, apellidos o email"
+              />
+              <select id="adminScheduleUserSelect" hidden></select>
+            </label>
+            <div class="field">
+              Mes
+              <div class="row tight month-nav">
+                <button class="btn ghost" id="adminSchedulePrevMonthBtn" type="button" aria-label="Mes anterior admin">◀</button>
+                <strong id="adminScheduleMonthLabel">-</strong>
+                <button class="btn ghost" id="adminScheduleNextMonthBtn" type="button" aria-label="Mes siguiente admin">▶</button>
+                <input id="adminScheduleMonthInput" type="month" hidden />
+              </div>
+            </div>
+            <label class="field">
+              Copiar desde mes
+              <input id="adminScheduleCopySourceMonthInput" type="month" />
+            </label>
+          </div>
+          <div id="adminScheduleUserSearchResults" class="search-results" hidden></div>
+          <p class="muted tiny" id="adminScheduleSelectedUserLabel">
+            Selecciona una persona para editar su cuadrante.
+          </p>
+          <div class="grid four">
+            <label class="field">
+              Día
+              <input id="adminScheduleDateInput" type="date" />
+            </label>
+            <label class="field">
+              Desde
+              <input id="adminScheduleRangeStartInput" type="date" />
+            </label>
+            <label class="field">
+              Hasta
+              <input id="adminScheduleRangeEndInput" type="date" />
+            </label>
+            <label class="field">
+              Tipo
+              <select id="adminScheduleTypeSelect">
+                <option value="WORK">Trabajo</option>
+                <option value="VACATION">Vacaciones</option>
+                <option value="SICK_LEAVE">Baja</option>
+                <option value="DAY_OFF">Día libre</option>
+                <option value="HOLIDAY">Festivo</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid three">
+            <label class="field">
+              Inicio (opcional)
+              <input id="adminScheduleStartTimeInput" type="time" />
+            </label>
+            <label class="field">
+              Fin (opcional)
+              <input id="adminScheduleEndTimeInput" type="time" />
+            </label>
+            <label class="field">
+              Notas
+              <input id="adminScheduleNotesInput" type="text" placeholder="Observaciones del día" />
+            </label>
+          </div>
+          <div class="field">
+            Aplicar solo en estos días de la semana
+            <div class="row tight">
+              <button class="btn ghost weekday-preset-btn" id="adminSchedulePresetWeekdaysBtn" type="button">L-V</button>
+              <button class="btn ghost weekday-preset-btn" id="adminSchedulePresetAllBtn" type="button">Todos</button>
+              <button class="btn ghost weekday-preset-btn" id="adminSchedulePresetClearBtn" type="button">Limpiar</button>
+            </div>
+            <div class="weekday-picker" id="adminScheduleWeekdayPicker">
+              <button class="weekday-toggle is-active" type="button" data-weekday="1">L</button>
+              <button class="weekday-toggle is-active" type="button" data-weekday="2">M</button>
+              <button class="weekday-toggle is-active" type="button" data-weekday="3">X</button>
+              <button class="weekday-toggle is-active" type="button" data-weekday="4">J</button>
+              <button class="weekday-toggle is-active" type="button" data-weekday="5">V</button>
+              <button class="weekday-toggle" type="button" data-weekday="6">S</button>
+              <button class="weekday-toggle" type="button" data-weekday="7">D</button>
+            </div>
+          </div>
+          <div class="row">
+            <button class="btn" id="saveAdminScheduleBtn">Guardar día</button>
+            <button class="btn" id="saveAdminScheduleRangeBtn">Aplicar rango</button>
+            <button class="btn ghost" id="saveAdminScheduleTemplateBtn">Guardar plantilla</button>
+            <button class="btn ghost" id="applyAdminScheduleTemplateBtn">Aplicar plantilla</button>
+            <button class="btn ghost" id="copyAdminScheduleMonthBtn">Copiar cuadrante</button>
+            <button class="btn ghost" id="deleteAdminScheduleBtn">Eliminar día</button>
+            <button class="btn ghost" id="refreshAdminScheduleBtn">Actualizar cuadrante</button>
+          </div>
+          <div id="adminScheduleTemplateSummary" class="schedule-template-summary">
+            <p class="muted tiny">Sin plantilla semanal guardada.</p>
+          </div>
+          <p class="muted tiny" id="adminScheduleTargetLabel">Selecciona una persona para ver su cuadrante.</p>
+          <div id="adminScheduleCalendar" class="schedule-calendar"></div>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Asignación directa de empresa</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Usa la persona seleccionada en el cuadrante para registrar directamente vacaciones, baja, día libre u horas extra sin esperar a una solicitud.
+          </p>
+          <p class="muted tiny" id="adminAssignTargetLabel">Selecciona una persona en el buscador del cuadrante.</p>
+          <div class="grid three">
+            <label class="field">
+              Tipo
+              <select id="adminAssignTypeSelect">
+                <option value="VACATION">Vacaciones</option>
+                <option value="SICK_LEAVE">Baja</option>
+                <option value="DAY_OFF">Día libre</option>
+                <option value="OVERTIME">Horas extra</option>
+              </select>
+            </label>
+            <label class="field">
+              Inicio
+              <input id="adminAssignStartInput" type="datetime-local" />
+            </label>
+            <label class="field">
+              Fin
+              <input id="adminAssignEndInput" type="datetime-local" />
+            </label>
+          </div>
+          <label class="field">
+            Comentario
+            <input id="adminAssignCommentInput" type="text" placeholder="Motivo o detalle opcional" />
+          </label>
+          <div class="row">
+            <button class="btn" id="adminAssignSubmitBtn">Asignar directamente</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Control de geolocalización (anti-fraude)</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Define uno o varios centros de trabajo para detectar fichajes fuera de rango y asociarlos al centro más cercano.
+          </p>
+          <div class="grid three">
+            <label class="field">
+              Centro seleccionado
+              <select id="workplaceSelectInput"></select>
+            </label>
+            <label class="field">
+              Centro
+              <button class="btn ghost" id="newWorkplaceBtn" type="button">Nuevo centro</button>
+            </label>
+            <label class="field">
+              Centro
+              <button class="btn danger" id="deleteWorkplaceBtn" type="button">Eliminar centro</button>
+            </label>
+          </div>
+          <div class="grid three">
+            <label class="field">
+              Nombre centro
+              <input id="workplaceNameInput" type="text" placeholder="Oficina principal" />
+            </label>
+            <label class="field">
+              Dirección legible
+              <input id="workplaceAddressInput" type="text" placeholder="C/ Islas Galápagos 36Bj" />
+            </label>
+            <label class="field">
+              Latitud
+              <input id="workplaceLatInput" type="number" step="0.0000001" placeholder="36.7213" />
+            </label>
+            <label class="field">
+              Longitud
+              <input id="workplaceLngInput" type="number" step="0.0000001" placeholder="-4.4214" />
+            </label>
+          </div>
+          <div class="grid four">
+            <label class="field">
+              Municipio
+              <input id="workplaceMunicipalityInput" type="text" placeholder="Aranjuez" />
+            </label>
+            <label class="field">
+              Provincia
+              <input id="workplaceProvinceInput" type="text" placeholder="Madrid" />
+            </label>
+            <label class="field">
+              Principal
+              <select id="workplacePrimaryInput">
+                <option value="true">Sí</option>
+                <option value="false">No</option>
+              </select>
+            </label>
+            <label class="field">
+              Activo
+              <select id="workplaceActiveInput">
+                <option value="true">Sí</option>
+                <option value="false">No</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid three">
+            <label class="field">
+              Radio permitido (metros)
+              <input id="workplaceRadiusInput" type="number" min="1" value="200" />
+            </label>
+            <label class="field">
+              Precisión máxima aceptable (m)
+              <input id="workplaceMaxAccuracyInput" type="number" min="0" value="80" />
+            </label>
+            <label class="field">
+              Modo estricto
+              <select id="workplaceStrictInput">
+                <option value="false">No (solo marcar sospechoso)</option>
+                <option value="true">Sí (bloquear fuera de zona)</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <button class="btn" id="saveWorkplaceBtn">Guardar zona de trabajo</button>
+            <button class="btn ghost" id="refreshWorkplaceBtn">Recargar zona</button>
+          </div>
+        </div>
+
+        <div class="card-head" style="margin-top: 16px;">
+          <h2>Fichajes sospechosos</h2>
+          <button class="btn ghost" id="refreshSuspiciousShiftsBtn">Actualizar sospechosos</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Empleado</th>
+                <th>Inicio</th>
+                <th>Fin</th>
+                <th>Centro</th>
+                <th>Ubicación</th>
+                <th>Riesgo</th>
+                <th>Geofence</th>
+                <th>Motivos</th>
+                <th>Mapa</th>
+              </tr>
+            </thead>
+            <tbody id="suspiciousShiftsBody"></tbody>
+          </table>
+        </div>
+
+        <div class="card-head" style="margin-top: 16px;">
+          <h2>Historial de fichajes de hoy</h2>
+          <button class="btn ghost" id="refreshAdminPresenceBtn">Actualizar historial</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Estado</th>
+                <th>Empleado</th>
+                <th>Grupo</th>
+                <th>Entrada</th>
+                <th>Salida</th>
+                <th>Centro</th>
+                <th>Ubicación</th>
+                <th>Mapa</th>
+              </tr>
+            </thead>
+            <tbody id="adminPresenceBody"></tbody>
+          </table>
+        </div>
+
+        <div class="card-head" style="margin-top: 16px;">
+          <h2>Solicitudes de empleados</h2>
+          <button class="btn ghost" id="refreshAdminRequestsBtn">Actualizar solicitudes</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Empleado</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Periodo</th>
+                <th>Comentario empleado</th>
+                <th>Comentario revisión</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="adminRequestsBody"></tbody>
+          </table>
+        </div>
+
+        <div class="card-head" style="margin-top: 16px;">
+          <h2>Gestión de personal</h2>
+          <button class="btn ghost" id="refreshAdminUsersBtn">Actualizar personal</button>
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Alta de usuario</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Se enviará un correo para que el usuario establezca su contraseña.
+          </p>
+          <div class="grid four">
+            <label class="field">
+              Nombre (opcional)
+              <input id="adminCreateNameInput" type="text" placeholder="Nombre y apellidos" />
+            </label>
+            <label class="field">
+              Email
+              <input id="adminCreateEmailInput" type="email" placeholder="nuevo@empresa.com" />
+            </label>
+            <label class="field">
+              Teléfono
+              <input id="adminCreatePhoneInput" type="text" placeholder="+34 600 000 000" />
+            </label>
+            <label class="field">
+              Rol
+              <select id="adminCreateRoleSelect">
+                <option value="EMPLOYEE">Trabajador</option>
+                <option value="ADMIN">Administrador</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid four">
+            <label class="field">
+              Grupo
+              <select id="adminCreateGroupSelect">
+                <option value="EMPLOYEE">Trabajador</option>
+                <option value="INTERN">Prácticas</option>
+              </select>
+            </label>
+            <label class="field">
+              Horas de prácticas (solo Prácticas)
+              <input id="adminCreateHoursInput" type="number" min="0" value="0" />
+            </label>
+            <label class="field">
+              Vacaciones anuales (días)
+              <input id="adminCreateVacationDaysInput" type="number" min="0" step="0.5" value="22" />
+            </label>
+            <label class="field">
+              Ajuste bolsa horas
+              <input id="adminCreateOvertimeAdjustmentInput" type="number" step="0.25" value="0" />
+            </label>
+          </div>
+          <div class="row">
+            <button class="btn" id="adminCreateBtn">Crear y enviar acceso</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Importación masiva desde Excel</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Sube un archivo <strong>.xlsx</strong> con cabeceras como <strong>Nombre y apellidos</strong>, <strong>Correo electrónico</strong>, <strong>Teléfono</strong>, <strong>Rol</strong> y <strong>Grupo</strong>. Si el grupo es <strong>Prácticas</strong>, puedes añadir también <strong>Horas de prácticas</strong>.
+          </p>
+          <div class="grid two">
+            <label class="field">
+              Archivo Excel
+              <input id="adminImportUsersFileInput" type="file" accept=".xlsx" />
+            </label>
+            <div class="field">
+              Ayuda rápida
+              <div class="muted tiny" style="padding: 12px 14px; border: 1px dashed var(--line); border-radius: 14px; background: var(--soft);">
+                Fila 1 = cabeceras. Cada fila siguiente = una persona. Rol y grupo son opcionales.
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <button class="btn ghost" id="exportUsersExcelBtn">Exportar personal actual</button>
+            <button class="btn ghost" id="downloadImportTemplateBtn">Descargar plantilla Excel</button>
+            <button class="btn" id="adminImportUsersBtn">Importar empleados</button>
+          </div>
+          <div id="adminImportUsersResult" class="schedule-template-summary">
+            <p class="muted tiny">Aquí verás el resultado de la importación.</p>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>Grupo</th>
+                <th>Horas prácticas</th>
+                <th>Vacaciones</th>
+                <th>Bolsa horas</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="adminUsersBody"></tbody>
+          </table>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Clave de activación para nuevo administrador</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Genera una clave única para una nueva empresa. Solo sirve una vez y caduca automáticamente.
+          </p>
+          <div class="grid three">
+            <label class="field">
+              CIF empresa
+              <input id="activationCompanyCifInput" type="text" placeholder="B12345678" pattern="[A-Za-z]\d{7}[0-9A-Za-z]" title="Formato esperado: B12345678" required />
+            </label>
+            <label class="field">
+              Nombre empresa
+              <input id="activationCompanyNameInput" type="text" placeholder="Acme S.L." required />
+            </label>
+            <label class="field">
+              Email admin inicial
+              <input id="activationAdminEmailInput" type="email" placeholder="admin@acme.com" required />
+            </label>
+          </div>
+          <div class="grid three">
+            <label class="field">
+              Nombre admin inicial
+              <input id="activationAdminNameInput" type="text" placeholder="Nombre y apellidos" required />
+            </label>
+            <label class="field">
+              Logo URL (opcional)
+              <input id="activationCompanyLogoInput" type="url" placeholder="https://..." />
+            </label>
+            <label class="field">
+              Caducidad (días)
+              <input id="activationExpiresDaysInput" type="number" min="1" value="14" />
+            </label>
+          </div>
+          <div class="row">
+            <button class="btn" id="createActivationKeyBtn">Generar clave de activación</button>
+          </div>
+        </div>
+
+        <div class="card-head" style="margin-top: 16px;">
+          <h2>Auditoría de cambios</h2>
+          <button class="btn ghost" id="refreshAuditLogsBtn">Actualizar auditoría</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Administrador</th>
+                <th>Usuario afectado</th>
+                <th>Acción</th>
+                <th>Cambios</th>
+              </tr>
+            </thead>
+            <tbody id="auditLogsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="reviewModal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <h3 id="reviewModalTitle">Revisar solicitud</h3>
+      <p class="muted">Puedes añadir un comentario opcional para el empleado.</p>
+      <label class="field">
+        Comentario de revisión
+        <textarea id="reviewCommentInput" rows="4" placeholder="Comentario opcional"></textarea>
+      </label>
+      <div class="row">
+        <button class="btn ghost" id="reviewCancelBtn">Cancelar</button>
+        <button class="btn" id="reviewConfirmBtn">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminUserProfileModal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <h3>Perfil de usuario</h3>
+      <p class="muted">Datos del usuario seleccionado.</p>
+      <div class="grid two">
+        <label class="field">
+          Nombre y apellidos
+          <input id="adminUserProfileName" type="text" disabled />
+        </label>
+        <label class="field">
+          Correo
+          <input id="adminUserProfileEmail" type="text" disabled />
+        </label>
+      </div>
+      <div class="grid two">
+        <label class="field">
+          Teléfono
+          <input id="adminUserProfilePhone" type="text" disabled />
+        </label>
+        <label class="field">
+          Fecha de nacimiento
+          <input id="adminUserProfileBirthDate" type="text" disabled />
+        </label>
+      </div>
+      <div class="grid two">
+        <label class="field">
+          Rol
+          <input id="adminUserProfileRole" type="text" disabled />
+        </label>
+        <label class="field">
+          Grupo
+          <input id="adminUserProfileGroup" type="text" disabled />
+        </label>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="adminUserProfileCloseBtn">Cerrar</button>
+        <button class="btn danger" id="adminUserDeleteBtn">Eliminar usuario</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mapModal" class="modal-backdrop" hidden>
+    <div class="modal-card" style="max-width: 820px;">
+      <h3 id="mapModalTitle">Mapa del fichaje</h3>
+      <p class="muted" id="mapModalSubtitle">Ubicación del fichaje seleccionado.</p>
+      <iframe
+        id="mapModalFrame"
+        title="Mapa de ubicación"
+        style="width: 100%; height: 420px; border: 1px solid var(--line); border-radius: 16px;"
+        loading="lazy"
+      ></iframe>
+      <div class="row" style="margin-top: 14px;">
+        <button class="btn ghost" id="mapModalCloseBtn">Cerrar</button>
+        <a class="btn" id="mapModalExternalLink" href="#" target="_blank" rel="noopener noreferrer">Abrir en OpenStreetMap</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

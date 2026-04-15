@@ -1,0 +1,339 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum WorkerGroup {
+  EMPLOYEE
+  INTERN
+}
+
+enum ScheduleEntryType {
+  WORK
+  VACATION
+  SICK_LEAVE
+  DAY_OFF
+  HOLIDAY
+}
+
+enum HolidayScope {
+  NATIONAL
+  REGIONAL
+  PROVINCIAL
+  LOCAL
+  COMPANY
+}
+
+enum NotificationType {
+  INTERN_40H_REMAINING
+  WEEKLY_LIMIT_EXCEEDED
+  OVERTIME_PENDING_APPROVAL
+}
+
+enum AuditAction {
+  USER_SETTINGS_UPDATED
+  USER_ROLE_UPDATED
+  USER_GROUP_UPDATED
+  USER_INTERNSHIP_HOURS_UPDATED
+}
+
+model Company {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  name         String
+  logoUrl      String?
+  isActive     Boolean  @default(true)
+  country      String?
+  region       String?
+  province     String?
+  municipality String?
+  postalCode   String?
+  createdAt    DateTime @default(now())
+
+  users      User[]
+  workplaces Workplace[]
+  holidays   Holiday[]
+}
+
+model AdminActivationKey {
+  id             String   @id @default(uuid())
+  keyHash        String   @unique
+  companyCode    String
+  companyName    String
+  companyLogoUrl String?
+  adminEmail     String
+  adminName      String?
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdByUserId String?
+  usedByUserId    String?
+  companyId       String?
+  createdAt      DateTime @default(now())
+
+  @@index([companyCode])
+  @@index([adminEmail])
+  @@index([expiresAt, usedAt])
+}
+
+model User {
+  id          String   @id @default(uuid())
+  firebaseUid String   @unique
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  email       String?
+  name        String?
+  phone       String?
+  birthDate   DateTime?
+  role        Role     @default(EMPLOYEE)
+  workerGroup WorkerGroup @default(EMPLOYEE)
+  internshipTotalHours Int?
+  vacationAllowanceDays Float?
+  overtimeBankMinutesAdjustment Int @default(0)
+  createdAt   DateTime @default(now())
+
+  shifts           Shift[]
+  scheduleEntries  ScheduleEntry[]
+  scheduleTemplateEntries ScheduleTemplateEntry[]
+  requests         Request[]  @relation("RequestOwner")
+  reviewedRequests Request[]  @relation("RequestReviewer")
+  documents        Document[]
+  notifications    Notification[]
+  auditLogsAsActor  AuditLog[] @relation("AuditActor")
+  auditLogsAsTarget AuditLog[] @relation("AuditTarget")
+
+  @@index([companyId, role])
+}
+
+model Shift {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workplaceId String?
+  workplace Workplace? @relation(fields: [workplaceId], references: [id], onDelete: SetNull)
+
+  startAt              DateTime
+  endAt                DateTime?
+  startLat             Float?
+  startLng             Float?
+  startAddress         String?
+  endLat               Float?
+  endLng               Float?
+  endAddress           String?
+  accuracy             Float?
+  startDistanceMeters  Float?
+  endDistanceMeters    Float?
+  startInsideGeofence  Boolean?
+  endInsideGeofence    Boolean?
+  riskScore            Int      @default(0)
+  riskReasons          Json?
+  isSuspicious         Boolean  @default(false)
+  startIp              String?
+  endIp                String?
+  startUserAgent       String?
+  endUserAgent         String?
+  createdAt            DateTime @default(now())
+
+  @@index([userId, startAt])
+  @@index([isSuspicious, startAt])
+  @@index([workplaceId])
+}
+
+model ScheduleEntry {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime
+  type      ScheduleEntryType
+  startTime String?
+  endTime   String?
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([userId, date])
+  @@index([date])
+}
+
+model ScheduleTemplateEntry {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekday   Int
+  type      ScheduleEntryType
+  startTime String?
+  endTime   String?
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([userId, weekday])
+  @@index([userId])
+}
+
+model Workplace {
+  id                 String   @id @default(uuid())
+  companyId          String
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name               String?
+  addressLabel       String?
+  country            String?
+  region             String?
+  province           String?
+  municipality       String?
+  postalCode         String?
+  lat                Float
+  lng                Float
+  radiusMeters       Int      @default(200)
+  strictMode         Boolean  @default(false)
+  isPrimary          Boolean  @default(false)
+  isActive           Boolean  @default(true)
+  maxAllowedAccuracy Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  shifts             Shift[]
+
+  @@index([companyId, strictMode])
+  @@index([companyId, isPrimary])
+  @@index([companyId, isActive])
+}
+
+model Holiday {
+  id           String       @id @default(uuid())
+  companyId    String
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  date         DateTime
+  name         String
+  scope        HolidayScope @default(COMPANY)
+  country      String?
+  region       String?
+  province     String?
+  municipality String?
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([companyId, date])
+  @@index([companyId, scope, date])
+}
+
+enum RequestType {
+  VACATION
+  SICK_LEAVE
+  DAY_OFF
+  OVERTIME
+  CORRECTION
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum RequestSource {
+  EMPLOYEE
+  COMPANY
+}
+
+model Request {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation("RequestOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  type   RequestType
+  status RequestStatus @default(PENDING)
+  source RequestSource @default(EMPLOYEE)
+
+  startAt DateTime
+  endAt   DateTime
+  comment String?
+
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?     @relation("RequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewComment String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, startAt])
+  @@index([status, type])
+  @@index([source])
+}
+
+enum DocumentType {
+  TIMESHEET
+}
+
+enum DocumentStatus {
+  DRAFT
+  SIGNED
+}
+
+model Document {
+  id     String         @id @default(uuid())
+  type   DocumentType
+  status DocumentStatus @default(DRAFT)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fromDate DateTime
+  toDate   DateTime
+
+  pdfBytes Bytes?
+  sha256   String?
+
+  signedAt       DateTime?
+  signatureImage Bytes?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, fromDate, toDate])
+}
+
+model Notification {
+  id      String           @id @default(uuid())
+  userId  String
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type    NotificationType
+  scopeKey String          @default("GLOBAL")
+  message String
+  meta    Json?
+
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+
+  @@index([userId, createdAt])
+  @@index([userId, type, readAt])
+  @@unique([userId, type, scopeKey])
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+
+  actorUserId String?
+  actorUser   User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  targetUserId String?
+  targetUser   User? @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  action AuditAction
+  meta   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([targetUserId, createdAt])
+}
