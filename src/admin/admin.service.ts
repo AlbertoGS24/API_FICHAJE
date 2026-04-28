@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { AuditAction, Prisma, Role, WorkerGroup } from '@prisma/client';
 import { spawn, spawnSync } from 'child_process';
+import { createHash, randomBytes } from 'crypto';
 import fs from 'fs';
 import { DateTime } from 'luxon';
 import path from 'path';
@@ -30,10 +31,16 @@ import { CreateHolidayDto, UpdateHolidayDto } from './dto/upsert-holiday.dto';
 import { ImportOfficialHolidaysDto } from './dto/import-official-holidays.dto';
 import { SendTestEmailDto } from './dto/send-test-email.dto';
 import {
+  OPENCLAW_AGENT_SCOPES,
+  RotateOpenClawTokenDto,
+} from './dto/openclaw-integration.dto';
+import {
   calculateExpectedWorkMinutes,
   calculateOvertimeMinutes,
   calculateVacationDayUsage,
 } from '../shared/work-metrics';
+import { normalizeInternationalPhone } from '../shared/phone';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 import ExcelJS from 'exceljs';
 
 const MADRID_LOCAL_HOLIDAYS_URL =
@@ -343,6 +350,47 @@ function backupStamp(date: Date) {
   )}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 }
 
+function buildOpenClawToken() {
+  return `ocla_${randomBytes(32).toString('base64url')}`;
+}
+
+function hashOpenClawToken(token: string) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function previewOpenClawToken(token: string) {
+  return `${token.slice(0, 10)}...${token.slice(-6)}`;
+}
+
+function normalizeOpenClawScopes(scopes?: string[]) {
+  if (!scopes?.length) return [...OPENCLAW_AGENT_SCOPES];
+  return [...new Set(scopes)];
+}
+
+function cleanEnv(name: string) {
+  return (process.env[name] ?? '').trim();
+}
+
+function hasRealEnvValue(name: string) {
+  const value = cleanEnv(name);
+  if (!value) return false;
+  return !/^YOUR_|^CHANGE_|^TODO|tu-dominio|example/i.test(value);
+}
+
+function envEnabled(name: string, fallback = false) {
+  return parseBooleanEnv(process.env[name], fallback);
+}
+
+function isLocalDatabaseUrl(databaseUrl: string) {
+  if (!databaseUrl) return false;
+  try {
+    const url = new URL(databaseUrl);
+    return ['localhost', '127.0.0.1', '0.0.0.0'].includes(url.hostname);
+  } catch {
+    return databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+  }
+}
+
 @Injectable()
 export class AdminService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AdminService.name);
@@ -372,6 +420,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly scheduleService: ScheduleService,
     private readonly mailService: MailService,
+    private readonly whatsappService: WhatsappService,
   ) {}
 
   onModuleInit() {
@@ -615,6 +664,155 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     return admin;
   }
 
+  private serializeOpenClawIntegration(
+    integration: {
+      id: string;
+      provider: string;
+      isEnabled: boolean;
+      tokenPreview: string | null;
+      scopes: string[];
+      lastUsedAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+    } | null,
+  ) {
+    if (!integration) {
+      return {
+        id: null,
+        provider: 'OPENCLAW',
+        isEnabled: false,
+        tokenPreview: null,
+        scopes: [...OPENCLAW_AGENT_SCOPES],
+        lastUsedAt: null,
+        createdAt: null,
+        updatedAt: null,
+      };
+    }
+
+    return integration;
+  }
+
+  async getOpenClawIntegration(firebaseUidAdmin: string) {
+    const admin = await this.getAdminForAudit(firebaseUidAdmin);
+    const integration = await this.prisma.agentIntegration.findUnique({
+      where: {
+        companyId_provider: {
+          companyId: admin.companyId,
+          provider: 'OPENCLAW',
+        },
+      },
+      select: {
+        id: true,
+        provider: true,
+        isEnabled: true,
+        tokenPreview: true,
+        scopes: true,
+        lastUsedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return this.serializeOpenClawIntegration(integration);
+  }
+
+  async getOpenClawAccessLogs(firebaseUidAdmin: string, limitRaw?: string) {
+    const admin = await this.getAdminForAudit(firebaseUidAdmin);
+    const parsedLimit = Number(limitRaw ?? '30');
+    const take =
+      Number.isFinite(parsedLimit) && parsedLimit > 0
+        ? Math.min(Math.trunc(parsedLimit), 100)
+        : 30;
+
+    return this.prisma.agentAccessLog.findMany({
+      where: {
+        companyId: admin.companyId,
+        provider: 'OPENCLAW',
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: {
+        id: true,
+        status: true,
+        reason: true,
+        method: true,
+        path: true,
+        ip: true,
+        userAgent: true,
+        createdAt: true,
+        integration: {
+          select: {
+            tokenPreview: true,
+          },
+        },
+      },
+    });
+  }
+
+  async rotateOpenClawToken(
+    firebaseUidAdmin: string,
+    dto: RotateOpenClawTokenDto,
+  ) {
+    const admin = await this.getAdminForAudit(firebaseUidAdmin);
+    const token = buildOpenClawToken();
+    const integration = await this.prisma.agentIntegration.upsert({
+      where: {
+        companyId_provider: {
+          companyId: admin.companyId,
+          provider: 'OPENCLAW',
+        },
+      },
+      update: {
+        isEnabled: true,
+        tokenHash: hashOpenClawToken(token),
+        tokenPreview: previewOpenClawToken(token),
+        scopes: normalizeOpenClawScopes(dto.scopes),
+      },
+      create: {
+        companyId: admin.companyId,
+        provider: 'OPENCLAW',
+        isEnabled: true,
+        tokenHash: hashOpenClawToken(token),
+        tokenPreview: previewOpenClawToken(token),
+        scopes: normalizeOpenClawScopes(dto.scopes),
+      },
+      select: {
+        id: true,
+        provider: true,
+        isEnabled: true,
+        tokenPreview: true,
+        scopes: true,
+        lastUsedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      integration,
+      token,
+      warning:
+        'Guarda este token ahora. Por seguridad, la API solo almacenará su hash y no podrá volver a mostrarlo completo.',
+    };
+  }
+
+  async revokeOpenClawIntegration(firebaseUidAdmin: string) {
+    const admin = await this.getAdminForAudit(firebaseUidAdmin);
+    await this.prisma.agentIntegration.updateMany({
+      where: {
+        companyId: admin.companyId,
+        provider: 'OPENCLAW',
+      },
+      data: {
+        isEnabled: false,
+        tokenHash: null,
+        tokenPreview: null,
+      },
+    });
+
+    return this.getOpenClawIntegration(firebaseUidAdmin);
+  }
+
   private async syncApprovedRequestToSchedule(request: {
     userId: string;
     type: string;
@@ -696,6 +894,36 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       const message =
         error instanceof Error ? error.message : 'Error desconocido';
       this.logger.warn(`No se pudo enviar correo (${context}): ${message}`);
+    }
+  }
+
+  private async sendWhatsappReviewedRequestNotificationSafely(
+    companyId: string,
+    request: RequestNotificationRecord,
+    adminName: string,
+    action: 'APPROVED' | 'REJECTED',
+  ) {
+    if (!request.type || !request.startAt || !request.endAt) {
+      return;
+    }
+
+    try {
+      await this.whatsappService.sendReviewedRequestNotification({
+        companyId,
+        userId: request.userId,
+        action,
+        typeLabel: this.getRequestTypeLabel(request.type),
+        periodLabel: this.formatRequestPeriod(request),
+        adminName,
+        employeeComment: request.comment,
+        reviewComment: request.reviewComment,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Error desconocido';
+      this.logger.warn(
+        `No se pudo enviar WhatsApp de solicitud (${request.id}): ${message}`,
+      );
     }
   }
 
@@ -1338,6 +1566,195 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         : latestFromDisk,
       lastBackupError: this.lastBackupError,
       backupDir: this.backupDir,
+    };
+  }
+
+  async getProductionStatus(firebaseUidAdmin: string) {
+    const admin = await this.getAdminForAudit(firebaseUidAdmin);
+    const databaseUrl = cleanEnv('DATABASE_URL');
+    const nodeEnv = cleanEnv('NODE_ENV') || 'development';
+    const corsAllowlist = cleanEnv('CORS_ORIGIN_ALLOWLIST') || cleanEnv('CORS_ORIGINS');
+    const mailEnabled = envEnabled('MAIL_ENABLED', false);
+    const turnstileEnabled = envEnabled('TURNSTILE_ENABLED', false);
+    const openClawEnabled = envEnabled('OPENCLAW_ENABLED', false);
+    const latestBackupFile = this.scanLatestBackupFile();
+
+    let migrationInfo: {
+      count: number;
+      latestFinishedAt: Date | null;
+    } | null = null;
+    try {
+      const rows = await this.prisma.$queryRaw<
+        Array<{ count: number; latestFinishedAt: Date | null }>
+      >`
+        SELECT COUNT(*)::int AS count, MAX(finished_at) AS "latestFinishedAt"
+        FROM "_prisma_migrations"
+        WHERE finished_at IS NOT NULL
+      `;
+      migrationInfo = rows[0] ?? null;
+    } catch {
+      migrationInfo = null;
+    }
+
+    const openClawIntegration = await this.prisma.agentIntegration.findUnique({
+      where: {
+        companyId_provider: {
+          companyId: admin.companyId,
+          provider: 'OPENCLAW',
+        },
+      },
+      select: {
+        isEnabled: true,
+        tokenPreview: true,
+        lastUsedAt: true,
+      },
+    });
+
+    const items = [
+      {
+        key: 'node-env',
+        label: 'Modo de ejecución',
+        status: nodeEnv === 'production' ? 'ok' : 'warning',
+        detail:
+          nodeEnv === 'production'
+            ? 'NODE_ENV está en production.'
+            : `Actualmente está en ${nodeEnv}. En despliegue real debe ser production.`,
+      },
+      {
+        key: 'database-url',
+        label: 'Base de datos PostgreSQL',
+        status: !databaseUrl
+          ? 'missing'
+          : isLocalDatabaseUrl(databaseUrl)
+            ? 'warning'
+            : 'ok',
+        detail: !databaseUrl
+          ? 'Falta DATABASE_URL.'
+          : isLocalDatabaseUrl(databaseUrl)
+            ? 'DATABASE_URL apunta a entorno local. En producción debe apuntar al proveedor real.'
+            : 'DATABASE_URL está configurada para un host no local.',
+      },
+      {
+        key: 'prisma-migrations',
+        label: 'Migraciones Prisma',
+        status: migrationInfo?.count ? 'ok' : 'missing',
+        detail: migrationInfo?.count
+          ? `${migrationInfo.count} migraciones aplicadas. Última: ${
+              migrationInfo.latestFinishedAt
+                ? migrationInfo.latestFinishedAt.toISOString()
+                : 'sin fecha'
+            }.`
+          : 'No se pudo confirmar el estado de migraciones.',
+      },
+      {
+        key: 'firebase',
+        label: 'Firebase definitivo',
+        status:
+          hasRealEnvValue('FIREBASE_WEB_API_KEY') &&
+          hasRealEnvValue('FIREBASE_PROJECT_ID')
+            ? 'ok'
+            : 'missing',
+        detail:
+          hasRealEnvValue('FIREBASE_WEB_API_KEY') &&
+          hasRealEnvValue('FIREBASE_PROJECT_ID')
+            ? 'Firebase web API key y project id configurados.'
+            : 'Faltan FIREBASE_WEB_API_KEY y/o FIREBASE_PROJECT_ID.',
+      },
+      {
+        key: 'cors',
+        label: 'Dominio frontend / CORS',
+        status: corsAllowlist && !corsAllowlist.includes('tu-dominio')
+          ? 'ok'
+          : 'missing',
+        detail: corsAllowlist && !corsAllowlist.includes('tu-dominio')
+          ? 'CORS_ORIGIN_ALLOWLIST tiene dominios configurados.'
+          : 'Falta configurar CORS_ORIGIN_ALLOWLIST con el dominio real.',
+      },
+      {
+        key: 'smtp',
+        label: 'Correo SMTP',
+        status: !mailEnabled
+          ? 'disabled'
+          : hasRealEnvValue('MAIL_FROM') &&
+              hasRealEnvValue('SMTP_HOST') &&
+              hasRealEnvValue('SMTP_USER') &&
+              hasRealEnvValue('SMTP_PASS')
+            ? 'ok'
+            : 'missing',
+        detail: !mailEnabled
+          ? 'MAIL_ENABLED=false. Correos desactivados.'
+          : 'MAIL_ENABLED=true. Revisa MAIL_FROM, SMTP_HOST, SMTP_USER y SMTP_PASS.',
+      },
+      {
+        key: 'turnstile',
+        label: 'CAPTCHA Turnstile',
+        status: !turnstileEnabled
+          ? 'disabled'
+          : hasRealEnvValue('TURNSTILE_SITE_KEY') &&
+              hasRealEnvValue('TURNSTILE_SECRET_KEY')
+            ? 'ok'
+            : 'missing',
+        detail: !turnstileEnabled
+          ? 'TURNSTILE_ENABLED=false. Registro público sin CAPTCHA activo.'
+          : 'Turnstile activado. Deben existir site key y secret key reales.',
+      },
+      {
+        key: 'openclaw',
+        label: 'OpenClaw',
+        status: !openClawEnabled
+          ? 'disabled'
+          : openClawIntegration?.isEnabled && openClawIntegration.tokenPreview
+            ? 'ok'
+            : 'warning',
+        detail: !openClawEnabled
+          ? 'OPENCLAW_ENABLED=false. Integración desactivada.'
+          : openClawIntegration?.isEnabled && openClawIntegration.tokenPreview
+            ? `Token activo para esta empresa (${openClawIntegration.tokenPreview}).`
+            : 'OpenClaw está activado globalmente, pero esta empresa no tiene token activo.',
+      },
+      {
+        key: 'backups',
+        label: 'Backups automáticos',
+        status: this.autoBackupEnabled
+          ? latestBackupFile
+            ? 'ok'
+            : 'warning'
+          : 'disabled',
+        detail: this.autoBackupEnabled
+          ? latestBackupFile
+            ? `Activo cada ${this.autoBackupIntervalHours}h. Último backup: ${latestBackupFile.name}.`
+            : `Activo cada ${this.autoBackupIntervalHours}h, pero todavía no hay backup detectado.`
+          : 'AUTO_BACKUP_ENABLED=false. Backups automáticos desactivados.',
+      },
+      {
+        key: 'secrets',
+        label: 'Secretos y repositorio',
+        status: 'warning',
+        detail:
+          'Comprobación manual: confirmar que .env, tokens y backups no se suben a GitHub.',
+      },
+    ];
+
+    const blockingCount = items.filter((item) => item.status === 'missing').length;
+    const warningCount = items.filter((item) => item.status === 'warning').length;
+    const okCount = items.filter((item) => item.status === 'ok').length;
+
+    return {
+      generatedAt: new Date().toISOString(),
+      environment: nodeEnv,
+      overallStatus:
+        blockingCount > 0
+          ? 'pending'
+          : warningCount > 0
+            ? 'review'
+            : 'ready',
+      summary: {
+        ok: okCount,
+        warnings: warningCount,
+        pending: blockingCount,
+        disabled: items.filter((item) => item.status === 'disabled').length,
+      },
+      items,
     };
   }
 
@@ -2335,7 +2752,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   ) {
     const email = dto.email.trim().toLowerCase();
     const name = dto.name?.trim() || null;
-    const phone = dto.phone?.trim() || null;
+    const phone = normalizeInternationalPhone(dto.phone);
     const role = dto.role ?? 'EMPLOYEE';
     const workerGroup = dto.workerGroup ?? 'EMPLOYEE';
     const sendPasswordSetupEmail = dto.sendPasswordSetupEmail !== false;
@@ -2357,6 +2774,16 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
     if (existing) {
       throw new BadRequestException('Ya existe un usuario con ese email');
+    }
+
+    if (phone) {
+      const existingPhone = await this.prisma.user.findFirst({
+        where: { companyId: adminCompanyId, phone },
+        select: { id: true },
+      });
+      if (existingPhone) {
+        throw new BadRequestException('Ya existe un usuario con ese teléfono');
+      }
     }
 
     const firebaseApp = getFirebaseAdminApp();
@@ -3256,6 +3683,12 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     if (!updated) throw new NotFoundException('Solicitud no encontrada');
     await this.syncApprovedRequestToSchedule(updated);
     await this.sendReviewedRequestNotification(admin, updated, 'APPROVED');
+    await this.sendWhatsappReviewedRequestNotificationSafely(
+      admin.companyId,
+      updated,
+      this.formatActorName(admin),
+      'APPROVED',
+    );
 
     return updated;
   }
@@ -3319,6 +3752,12 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     });
     if (!updated) throw new NotFoundException('Solicitud no encontrada');
     await this.sendReviewedRequestNotification(admin, updated, 'REJECTED');
+    await this.sendWhatsappReviewedRequestNotificationSafely(
+      admin.companyId,
+      updated,
+      this.formatActorName(admin),
+      'REJECTED',
+    );
 
     return updated;
   }

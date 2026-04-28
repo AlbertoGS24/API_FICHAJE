@@ -3,6 +3,7 @@ import { AdminService } from './admin.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleService } from '../schedule/schedule.service';
 import { MailService } from '../mail/mail.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 type MockFn = jest.Mock<any, any>;
 
@@ -28,7 +29,11 @@ function createServiceDeps() {
     sendTextEmail: jest.fn(),
   };
 
-  return { prisma, schedule, mail };
+  const whatsapp = {
+    sendReviewedRequestNotification: jest.fn(),
+  };
+
+  return { prisma, schedule, mail, whatsapp };
 }
 
 describe('AdminService official holidays import', () => {
@@ -40,7 +45,7 @@ describe('AdminService official holidays import', () => {
   });
 
   it('importa festivos oficiales de Madrid evitando duplicados', async () => {
-    const { prisma, schedule, mail } = createServiceDeps();
+    const { prisma, schedule, mail, whatsapp } = createServiceDeps();
     (prisma.user.findUnique as MockFn).mockResolvedValue({
       id: 'admin-1',
       email: 'admin@empresa.com',
@@ -104,6 +109,7 @@ describe('AdminService official holidays import', () => {
       prisma as unknown as PrismaService,
       schedule as unknown as ScheduleService,
       mail as unknown as MailService,
+      whatsapp as unknown as WhatsappService,
     );
 
     const result = await service.importOfficialHolidays('firebase-admin', {
@@ -137,7 +143,7 @@ describe('AdminService official holidays import', () => {
   });
 
   it('rechaza la importacion automatica fuera de Madrid', async () => {
-    const { prisma, schedule, mail } = createServiceDeps();
+    const { prisma, schedule, mail, whatsapp } = createServiceDeps();
     (prisma.user.findUnique as MockFn).mockResolvedValue({
       id: 'admin-1',
       email: 'admin@empresa.com',
@@ -160,6 +166,7 @@ describe('AdminService official holidays import', () => {
       prisma as unknown as PrismaService,
       schedule as unknown as ScheduleService,
       mail as unknown as MailService,
+      whatsapp as unknown as WhatsappService,
     );
 
     await expect(

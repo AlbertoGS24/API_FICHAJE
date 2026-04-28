@@ -16,6 +16,7 @@
     "restore:db": "node scripts/restore-db.js",
     "verify:restore:db": "node scripts/verify-restore-db.js",
     "issue:company-key": "node scripts/issue-company-key.js",
+    "issue:openclaw-token": "node scripts/issue-openclaw-token.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",

@@ -18,6 +18,11 @@ const state = {
   adminScheduleUserId: '',
   auditLogs: [],
   backupStatus: null,
+  productionStatus: null,
+  openClawIntegration: null,
+  openClawAccessLogs: [],
+  whatsappIntegration: null,
+  whatsappLogs: [],
   companyLocation: null,
   holidays: [],
   workplace: null,
@@ -188,12 +193,43 @@ const els = {
   dashboardStats: $('dashboardStats'),
   refreshAdminBtn: $('refreshAdminBtn'),
   runBackupNowBtn: $('runBackupNowBtn'),
+  refreshProductionStatusBtn: $('refreshProductionStatusBtn'),
+  productionOverallLabel: $('productionOverallLabel'),
+  productionOkLabel: $('productionOkLabel'),
+  productionWarningLabel: $('productionWarningLabel'),
+  productionPendingLabel: $('productionPendingLabel'),
+  productionStatusBody: $('productionStatusBody'),
   refreshBackupStatusBtn: $('refreshBackupStatusBtn'),
   backupLastLabel: $('backupLastLabel'),
   backupNextLabel: $('backupNextLabel'),
   backupStatusLabel: $('backupStatusLabel'),
   testEmailRecipientInput: $('testEmailRecipientInput'),
   sendTestEmailBtn: $('sendTestEmailBtn'),
+  openClawEnabledLabel: $('openClawEnabledLabel'),
+  openClawTokenPreviewLabel: $('openClawTokenPreviewLabel'),
+  openClawLastUsedLabel: $('openClawLastUsedLabel'),
+  openClawTokenOutput: $('openClawTokenOutput'),
+  openClawAccessLogBody: $('openClawAccessLogBody'),
+  refreshOpenClawIntegrationBtn: $('refreshOpenClawIntegrationBtn'),
+  rotateOpenClawTokenBtn: $('rotateOpenClawTokenBtn'),
+  revokeOpenClawBtn: $('revokeOpenClawBtn'),
+  whatsappEnabledInput: $('whatsappEnabledInput'),
+  whatsappDisplayPhoneInput: $('whatsappDisplayPhoneInput'),
+  whatsappPhoneNumberIdInput: $('whatsappPhoneNumberIdInput'),
+  whatsappBusinessAccountIdInput: $('whatsappBusinessAccountIdInput'),
+  whatsappAllowClockInInput: $('whatsappAllowClockInInput'),
+  whatsappAllowClockOutInput: $('whatsappAllowClockOutInput'),
+  whatsappRequireLocationInput: $('whatsappRequireLocationInput'),
+  whatsappStatusLabel: $('whatsappStatusLabel'),
+  whatsappProviderReadyLabel: $('whatsappProviderReadyLabel'),
+  whatsappLastInboundLabel: $('whatsappLastInboundLabel'),
+  whatsappLastOutboundLabel: $('whatsappLastOutboundLabel'),
+  refreshWhatsappIntegrationBtn: $('refreshWhatsappIntegrationBtn'),
+  saveWhatsappIntegrationBtn: $('saveWhatsappIntegrationBtn'),
+  whatsappTestPhoneInput: $('whatsappTestPhoneInput'),
+  whatsappTestMessageInput: $('whatsappTestMessageInput'),
+  sendWhatsappTestBtn: $('sendWhatsappTestBtn'),
+  whatsappLogsBody: $('whatsappLogsBody'),
   adminExportFromInput: $('adminExportFromInput'),
   adminExportToInput: $('adminExportToInput'),
   exportCompanyExcelBtn: $('exportCompanyExcelBtn'),
@@ -703,6 +739,27 @@ function validateEmailInput(input) {
   return ok;
 }
 
+function normalizeInternationalPhoneInput(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  let normalized = raw.replace(/[\s().-]+/g, '');
+  if (normalized.startsWith('00')) {
+    normalized = `+${normalized.slice(2)}`;
+  }
+  if (/^[6789]\d{8}$/.test(normalized)) {
+    normalized = `+34${normalized}`;
+  }
+
+  if (!/^\+[1-9]\d{7,14}$/.test(normalized)) {
+    throw new Error(
+      'El teléfono debe estar en formato internacional. Ejemplo: +34600111222',
+    );
+  }
+
+  return normalized;
+}
+
 function bindEmailValidation() {
   const emailInputs = Array.from(document.querySelectorAll('input[type="email"]'));
   emailInputs.forEach((input) => {
@@ -832,6 +889,11 @@ const ADMIN_VIEW_META = {
     description:
       'Claves de activación y preparación del primer administrador.',
   },
+  integraciones: {
+    heading: 'Integraciones externas',
+    description:
+      'Configuración de OpenClaw y WhatsApp Business por empresa.',
+  },
   auditoria: {
     heading: 'Auditoría de cambios',
     description:
@@ -847,6 +909,7 @@ function getAdminViewElements(view) {
   const map = {
     resumen: [els.dashboardStats],
     operaciones: [
+      els.refreshProductionStatusBtn?.closest('.card'),
       els.runBackupNowBtn?.closest('.card'),
       els.sendTestEmailBtn?.closest('.card'),
       els.exportCompanyExcelBtn?.closest('.card'),
@@ -877,6 +940,10 @@ function getAdminViewElements(view) {
       els.adminUsersBody?.closest('.table-wrap'),
     ],
     onboarding: [els.createActivationKeyBtn?.closest('.card')],
+    integraciones: [
+      els.rotateOpenClawTokenBtn?.closest('.card'),
+      els.saveWhatsappIntegrationBtn?.closest('.card'),
+    ],
     auditoria: [
       els.refreshAuditLogsBtn?.closest('.card-head'),
       els.auditLogsBody?.closest('.table-wrap'),
@@ -1220,6 +1287,7 @@ function clearSession() {
   state.me = null;
   state.myProfile = null;
   state.backupStatus = null;
+  state.productionStatus = null;
   state.companyLocation = null;
   state.holidays = [];
   state.adminProfileTargetUserId = null;
@@ -1236,6 +1304,7 @@ function clearSession() {
   closeAdminUserProfileModal();
   stopWorkTimer();
   renderBackupStatus();
+  renderProductionStatus();
   localStorage.removeItem('fichar.idToken');
   els.tokenInput.value = '';
   setSessionViews();
@@ -1610,7 +1679,7 @@ async function loadCurrentRouteData() {
   }
 
   if (adminView === 'operaciones') {
-    await Promise.all([loadBackupStatus(), loadAdminUsers()]);
+    await Promise.all([loadProductionStatus(), loadBackupStatus(), loadAdminUsers()]);
     return;
   }
 
@@ -1642,6 +1711,11 @@ async function loadCurrentRouteData() {
 
   if (adminView === 'personal') {
     await loadAdminUsers();
+    return;
+  }
+
+  if (adminView === 'integraciones') {
+    await Promise.all([loadOpenClawIntegration(), loadWhatsappIntegration()]);
     return;
   }
 
@@ -1780,10 +1854,19 @@ async function saveMyProfile() {
     return;
   }
 
+  let phone = '';
+  try {
+    phone = normalizeInternationalPhoneInput(els.profilePhoneInput.value);
+  } catch (error) {
+    showFlash('error', error.message);
+    els.profilePhoneInput.focus();
+    return;
+  }
+
   const payload = {
     name: els.profileNameInput.value.trim(),
     email,
-    phone: els.profilePhoneInput.value.trim(),
+    phone: phone || null,
     birthDate: els.profileBirthDateInput.value || null,
   };
 
@@ -2200,6 +2283,23 @@ function scheduleTypeClass(type) {
   return 'empty';
 }
 
+function schedulePlannedTimeParts(entry) {
+  if (!entry) return { start: '', end: '', duration: '' };
+
+  return {
+    start: entry.plannedStartTime || entry.startTime || '',
+    end: entry.plannedEndTime || entry.endTime || '',
+    duration: entry.plannedDurationLabel || '',
+  };
+}
+
+function schedulePlannedTimeLabel(entry) {
+  const { start, end } = schedulePlannedTimeParts(entry);
+  if (start && end) return `Previsto: ${start} - ${end}`;
+  if (entry?.type === 'WORK') return 'Trabajo sin horario previsto';
+  return '';
+}
+
 function weekdayShortLabel(weekday) {
   if (weekday === 1) return 'Lunes';
   if (weekday === 2) return 'Martes';
@@ -2249,12 +2349,10 @@ function buildScheduleCalendar(monthValue, entries, options = {}) {
     )}`;
     const entry = entryMap.get(dateKey) || null;
     const typeLabel = entry ? scheduleTypeLabel(entry.type) : 'Sin evento';
-    const timeLabel =
-      entry && entry.startTime && entry.endTime
-        ? `${entry.startTime} - ${entry.endTime}`
-        : entry && entry.type === 'WORK'
-          ? 'Trabajo sin horario'
-          : '';
+    const timeLabel = schedulePlannedTimeLabel(entry);
+    const durationLabel = entry?.plannedDurationLabel
+      ? `Duración prevista: ${entry.plannedDurationLabel}`
+      : '';
     const notesLabel = entry?.notes ? safeText(entry.notes) : '';
     const classes = [
       'schedule-day',
@@ -2275,6 +2373,7 @@ function buildScheduleCalendar(monthValue, entries, options = {}) {
         <span class="schedule-day-number">${day}</span>
         <span class="schedule-day-type">${safeText(typeLabel)}</span>
         ${timeLabel ? `<span class="schedule-day-time">${safeText(timeLabel)}</span>` : ''}
+        ${durationLabel ? `<span class="schedule-day-duration">${safeText(durationLabel)}</span>` : ''}
         ${notesLabel ? `<span class="schedule-day-notes">${notesLabel}</span>` : ''}
       </${tag}>`,
     );
@@ -2619,17 +2718,19 @@ function renderAdminScheduleTemplateSummary() {
     .sort((a, b) => a.weekday - b.weekday)
     .map((entry) => {
       const timeLabel =
-        entry.startTime && entry.endTime
-          ? `${entry.startTime} - ${entry.endTime}`
-          : entry.type === 'WORK'
-            ? 'Trabajo sin horario'
-            : 'Sin horario';
+        schedulePlannedTimeLabel(entry) ||
+        (entry.type === 'WORK'
+          ? 'Trabajo sin horario previsto'
+          : 'Sin horario previsto');
+      const durationLabel = entry.plannedDurationLabel
+        ? ` · ${entry.plannedDurationLabel}`
+        : '';
       const notes = entry.notes
         ? `<div class="search-result-meta">${safeText(entry.notes)}</div>`
         : '';
       return `<div class="schedule-template-item">
         <strong>${safeText(weekdayShortLabel(entry.weekday))}</strong>
-        <div>${safeText(scheduleTypeLabel(entry.type))} · ${safeText(timeLabel)}</div>
+        <div>${safeText(scheduleTypeLabel(entry.type))} · ${safeText(timeLabel)}${safeText(durationLabel)}</div>
         ${notes}
       </div>`;
     })
@@ -2658,6 +2759,50 @@ function fillAdminScheduleForm(dateKey, entry = null) {
   if (els.adminScheduleNotesInput) {
     els.adminScheduleNotesInput.value = entry?.notes || '';
   }
+  syncAdminSchedulePlannedTimeControls();
+}
+
+function syncAdminSchedulePlannedTimeControls() {
+  const isWork = els.adminScheduleTypeSelect?.value === 'WORK';
+  const fields = [
+    els.adminScheduleStartTimeInput,
+    els.adminScheduleEndTimeInput,
+  ].filter(Boolean);
+
+  fields.forEach((field) => {
+    field.disabled = !isWork;
+    field.title = isWork
+      ? 'Hora prevista de fichaje para días de trabajo'
+      : 'Solo se usa en días de trabajo';
+    if (!isWork) {
+      field.value = '';
+    }
+  });
+}
+
+function validateAdminSchedulePlannedTimes() {
+  if (els.adminScheduleTypeSelect?.value !== 'WORK') return true;
+
+  const startTime = els.adminScheduleStartTimeInput?.value || '';
+  const endTime = els.adminScheduleEndTimeInput?.value || '';
+
+  if (!!startTime !== !!endTime) {
+    showFlash(
+      'error',
+      'Indica entrada prevista y salida prevista, o deja ambas vacías.',
+    );
+    return false;
+  }
+
+  if (startTime && endTime && endTime <= startTime) {
+    showFlash(
+      'error',
+      'La salida prevista debe ser posterior a la entrada prevista.',
+    );
+    return false;
+  }
+
+  return true;
 }
 
 function renderAdminSchedule() {
@@ -2756,6 +2901,7 @@ async function saveAdminSchedule() {
     showFlash('error', 'Debes seleccionar empleado y día para guardar el cuadrante.');
     return;
   }
+  if (!validateAdminSchedulePlannedTimes()) return;
 
   try {
     await api('/admin/schedule', {
@@ -2794,6 +2940,7 @@ async function saveAdminScheduleRange() {
     showFlash('error', 'Selecciona al menos un día de la semana.');
     return;
   }
+  if (!validateAdminSchedulePlannedTimes()) return;
 
   try {
     const result = await api('/admin/schedule/bulk', {
@@ -2831,6 +2978,7 @@ async function saveAdminScheduleTemplate() {
     showFlash('error', 'Selecciona al menos un día de la semana para la plantilla.');
     return;
   }
+  if (!validateAdminSchedulePlannedTimes()) return;
 
   try {
     const result = await api('/admin/schedule/template', {
@@ -3358,6 +3506,78 @@ function renderBackupStatus() {
     : 'Manual';
 }
 
+function productionStatusLabel(status) {
+  if (status === 'ok') return 'Configurado';
+  if (status === 'warning') return 'Revisar';
+  if (status === 'missing') return 'Pendiente';
+  if (status === 'disabled') return 'Desactivado';
+  return status || '-';
+}
+
+function productionOverallLabel(status) {
+  if (status === 'ready') return 'Preparado';
+  if (status === 'review') return 'Revisar';
+  if (status === 'pending') return 'Pendiente';
+  return '-';
+}
+
+function renderProductionStatus() {
+  if (
+    !els.productionOverallLabel ||
+    !els.productionOkLabel ||
+    !els.productionWarningLabel ||
+    !els.productionPendingLabel ||
+    !els.productionStatusBody
+  ) {
+    return;
+  }
+
+  const status = state.productionStatus;
+  if (!status) {
+    els.productionOverallLabel.textContent = '-';
+    els.productionOkLabel.textContent = '0';
+    els.productionWarningLabel.textContent = '0';
+    els.productionPendingLabel.textContent = '0';
+    els.productionStatusBody.innerHTML =
+      '<tr><td colspan="3">Pulsa revisar estado para comprobar la configuración.</td></tr>';
+    return;
+  }
+
+  els.productionOverallLabel.textContent = productionOverallLabel(
+    status.overallStatus,
+  );
+  els.productionOkLabel.textContent = String(status.summary?.ok ?? 0);
+  els.productionWarningLabel.textContent = String(status.summary?.warnings ?? 0);
+  els.productionPendingLabel.textContent = String(status.summary?.pending ?? 0);
+
+  const items = Array.isArray(status.items) ? status.items : [];
+  els.productionStatusBody.innerHTML = items.length
+    ? items
+        .map(
+          (item) => `<tr>
+            <td>${safeText(item.label)}</td>
+            <td><span class="production-status-badge ${safeText(
+              item.status,
+            )}">${safeText(productionStatusLabel(item.status))}</span></td>
+            <td>${safeText(item.detail)}</td>
+          </tr>`,
+        )
+        .join('')
+    : '<tr><td colspan="3">No hay comprobaciones disponibles.</td></tr>';
+}
+
+async function loadProductionStatus(showSuccess = false) {
+  try {
+    state.productionStatus = await api('/admin/system/production-status');
+    renderProductionStatus();
+    if (showSuccess) {
+      showFlash('success', 'Estado de producción actualizado.');
+    }
+  } catch (error) {
+    showFlash('error', `No se pudo cargar estado de producción: ${error.message}`);
+  }
+}
+
 async function loadBackupStatus(showSuccess = false) {
   try {
     state.backupStatus = await api('/admin/system/backup-status');
@@ -3382,6 +3602,270 @@ async function runBackupNow() {
     showFlash('success', `Backup generado correctamente: ${fileName}`);
   } catch (error) {
     showFlash('error', `No se pudo generar backup: ${error.message}`);
+  }
+}
+
+function selectedOpenClawScopes() {
+  const selected = [...document.querySelectorAll('.openclaw-scope-input')]
+    .filter((input) => input.checked)
+    .map((input) => input.value);
+
+  return selected.length
+    ? selected
+    : ['read:summary', 'read:requests', 'read:shifts', 'read:schedule'];
+}
+
+function syncOpenClawScopeInputs(scopes = []) {
+  document.querySelectorAll('.openclaw-scope-input').forEach((input) => {
+    input.checked = scopes.length ? scopes.includes(input.value) : true;
+  });
+}
+
+function renderOpenClawIntegration() {
+  const integration = state.openClawIntegration;
+  if (!els.openClawEnabledLabel) return;
+
+  els.openClawEnabledLabel.textContent = integration?.isEnabled
+    ? 'Activo'
+    : 'Inactivo';
+  els.openClawTokenPreviewLabel.textContent =
+    integration?.tokenPreview || 'Sin token';
+  els.openClawLastUsedLabel.textContent = integration?.lastUsedAt
+    ? formatDateTime(integration.lastUsedAt)
+    : 'Sin uso';
+  syncOpenClawScopeInputs(integration?.scopes || []);
+}
+
+function renderOpenClawAccessLogs() {
+  if (!els.openClawAccessLogBody) return;
+  const logs = Array.isArray(state.openClawAccessLogs)
+    ? state.openClawAccessLogs
+    : [];
+
+  if (!logs.length) {
+    els.openClawAccessLogBody.innerHTML =
+      '<tr><td colspan="5">Sin accesos registrados.</td></tr>';
+    return;
+  }
+
+  els.openClawAccessLogBody.innerHTML = logs
+    .map(
+      (log) => `<tr>
+        <td>${safeText(formatDateTime(log.createdAt))}</td>
+        <td>${safeText(log.status === 'ALLOWED' ? 'Permitido' : 'Denegado')}</td>
+        <td>${safeText(`${log.method || ''} ${log.path || ''}`.trim())}</td>
+        <td>${safeText(log.reason || '-')}</td>
+        <td>${safeText(log.ip || '-')}</td>
+      </tr>`,
+    )
+    .join('');
+}
+
+function renderWhatsappIntegration() {
+  const integration = state.whatsappIntegration;
+  if (!els.whatsappEnabledInput) return;
+
+  els.whatsappEnabledInput.checked = !!integration?.isEnabled;
+  els.whatsappDisplayPhoneInput.value = integration?.displayPhoneNumber || '';
+  els.whatsappPhoneNumberIdInput.value = integration?.phoneNumberId || '';
+  els.whatsappBusinessAccountIdInput.value =
+    integration?.businessAccountId || '';
+  els.whatsappAllowClockInInput.checked = integration?.allowClockIn !== false;
+  els.whatsappAllowClockOutInput.checked = integration?.allowClockOut !== false;
+  els.whatsappRequireLocationInput.checked =
+    integration?.requireLocation !== false;
+
+  if (els.whatsappStatusLabel) {
+    els.whatsappStatusLabel.textContent = integration?.isEnabled
+      ? 'Activo'
+      : 'Inactivo';
+  }
+  if (els.whatsappProviderReadyLabel) {
+    els.whatsappProviderReadyLabel.textContent = integration?.providerReady
+      ? 'Listo'
+      : 'Pendiente';
+  }
+  if (els.whatsappLastInboundLabel) {
+    els.whatsappLastInboundLabel.textContent = integration?.lastInboundAt
+      ? formatDateTime(integration.lastInboundAt)
+      : 'Sin actividad';
+  }
+  if (els.whatsappLastOutboundLabel) {
+    els.whatsappLastOutboundLabel.textContent = integration?.lastOutboundAt
+      ? formatDateTime(integration.lastOutboundAt)
+      : 'Sin actividad';
+  }
+}
+
+function renderWhatsappLogs() {
+  if (!els.whatsappLogsBody) return;
+  const logs = Array.isArray(state.whatsappLogs) ? state.whatsappLogs : [];
+
+  if (!logs.length) {
+    els.whatsappLogsBody.innerHTML =
+      '<tr><td colspan="6">Sin mensajes registrados.</td></tr>';
+    return;
+  }
+
+  els.whatsappLogsBody.innerHTML = logs
+    .map(
+      (log) => `<tr>
+        <td>${safeText(formatDateTime(log.createdAt))}</td>
+        <td>${safeText(log.direction === 'OUTBOUND' ? 'Salida' : 'Entrada')}</td>
+        <td>${safeText(log.status || '-')}</td>
+        <td>${safeText(log.command || log.messageType || '-')}</td>
+        <td>${safeText(log.user?.name || log.user?.email || log.toPhone || log.fromPhone || '-')}</td>
+        <td>${safeText(log.errorMessage || log.body || '-')}</td>
+      </tr>`,
+    )
+    .join('');
+}
+
+async function loadWhatsappLogs() {
+  try {
+    state.whatsappLogs = await api('/admin/integrations/whatsapp/logs?limit=30');
+    renderWhatsappLogs();
+  } catch (error) {
+    state.whatsappLogs = [];
+    renderWhatsappLogs();
+    showFlash('error', `No se pudo cargar el log de WhatsApp: ${error.message}`);
+  }
+}
+
+async function loadWhatsappIntegration(showSuccess = false) {
+  try {
+    const [integration] = await Promise.all([
+      api('/admin/integrations/whatsapp'),
+      loadWhatsappLogs(),
+    ]);
+    state.whatsappIntegration = integration;
+    renderWhatsappIntegration();
+    if (showSuccess) {
+      showFlash('success', 'Integración WhatsApp actualizada.');
+    }
+  } catch (error) {
+    showFlash('error', `No se pudo cargar WhatsApp: ${error.message}`);
+  }
+}
+
+async function saveWhatsappIntegration() {
+  try {
+    state.whatsappIntegration = await api('/admin/integrations/whatsapp', {
+      method: 'POST',
+      body: {
+        isEnabled: !!els.whatsappEnabledInput?.checked,
+        displayPhoneNumber: els.whatsappDisplayPhoneInput?.value.trim() || null,
+        phoneNumberId: els.whatsappPhoneNumberIdInput?.value.trim() || null,
+        businessAccountId:
+          els.whatsappBusinessAccountIdInput?.value.trim() || null,
+        allowClockIn: !!els.whatsappAllowClockInInput?.checked,
+        allowClockOut: !!els.whatsappAllowClockOutInput?.checked,
+        requireLocation: !!els.whatsappRequireLocationInput?.checked,
+      },
+    });
+    renderWhatsappIntegration();
+    showFlash('success', 'Configuración de WhatsApp guardada.');
+  } catch (error) {
+    showFlash('error', `No se pudo guardar WhatsApp: ${error.message}`);
+  }
+}
+
+async function sendWhatsappTestMessage() {
+  const toPhone = els.whatsappTestPhoneInput?.value.trim() || '';
+  const message = els.whatsappTestMessageInput?.value.trim() || '';
+
+  try {
+    const result = await api('/admin/integrations/whatsapp/test-message', {
+      method: 'POST',
+      body: { toPhone, message },
+    });
+    await loadWhatsappLogs();
+    showFlash('success', `Mensaje de prueba enviado a ${result.toPhone}.`);
+  } catch (error) {
+    showFlash(
+      'error',
+      `No se pudo enviar el WhatsApp de prueba: ${error.message}`,
+    );
+  }
+}
+
+async function loadOpenClawAccessLogs() {
+  try {
+    state.openClawAccessLogs = await api('/admin/integrations/openclaw/access-logs?limit=30');
+    renderOpenClawAccessLogs();
+  } catch (error) {
+    state.openClawAccessLogs = [];
+    renderOpenClawAccessLogs();
+    showFlash('error', `No se pudo cargar auditoría OpenClaw: ${error.message}`);
+  }
+}
+
+async function loadOpenClawIntegration(showSuccess = false) {
+  try {
+    const [integration] = await Promise.all([
+      api('/admin/integrations/openclaw'),
+      loadOpenClawAccessLogs(),
+    ]);
+    state.openClawIntegration = integration;
+    renderOpenClawIntegration();
+    if (showSuccess) {
+      showFlash('success', 'Integración OpenClaw actualizada.');
+    }
+  } catch (error) {
+    showFlash('error', `No se pudo cargar OpenClaw: ${error.message}`);
+  }
+}
+
+async function rotateOpenClawToken() {
+  if (
+    !confirm(
+      'Se generará un nuevo token OpenClaw. El token anterior dejará de funcionar. ¿Continuar?',
+    )
+  ) {
+    return;
+  }
+
+  try {
+    const result = await api('/admin/integrations/openclaw/token', {
+      method: 'POST',
+      body: { scopes: selectedOpenClawScopes() },
+    });
+    state.openClawIntegration = result.integration;
+    renderOpenClawIntegration();
+    await loadOpenClawAccessLogs();
+
+    if (els.openClawTokenOutput) {
+      els.openClawTokenOutput.hidden = false;
+      els.openClawTokenOutput.textContent = `TOKEN COMPLETO (guardar ahora):\n${result.token}`;
+    }
+
+    showFlash(
+      'success',
+      'Token OpenClaw generado. Guárdalo ahora: no se podrá volver a ver completo.',
+    );
+  } catch (error) {
+    showFlash('error', `No se pudo generar token OpenClaw: ${error.message}`);
+  }
+}
+
+async function revokeOpenClawIntegration() {
+  if (!confirm('Se revocará el token OpenClaw actual. ¿Continuar?')) {
+    return;
+  }
+
+  try {
+    state.openClawIntegration = await api('/admin/integrations/openclaw/revoke', {
+      method: 'POST',
+    });
+    renderOpenClawIntegration();
+    await loadOpenClawAccessLogs();
+    if (els.openClawTokenOutput) {
+      els.openClawTokenOutput.hidden = true;
+      els.openClawTokenOutput.textContent = '';
+    }
+    showFlash('success', 'Token OpenClaw revocado.');
+  } catch (error) {
+    showFlash('error', `No se pudo revocar OpenClaw: ${error.message}`);
   }
 }
 
@@ -4181,10 +4665,19 @@ async function createAdminUser() {
     return;
   }
 
+  let normalizedPhone = '';
+  try {
+    normalizedPhone = normalizeInternationalPhoneInput(phone);
+  } catch (error) {
+    showFlash('error', error.message);
+    els.adminCreatePhoneInput.focus();
+    return;
+  }
+
   const payload = {
     email,
     name: name || undefined,
-    phone: phone || undefined,
+    phone: normalizedPhone || undefined,
     role,
     workerGroup,
     vacationAllowanceDays,
@@ -4694,8 +5187,21 @@ function bindEvents() {
   els.refreshAdminUsersBtn.addEventListener('click', loadAdminUsers);
   els.refreshAuditLogsBtn.addEventListener('click', loadAuditLogs);
   els.adminHomeBtn.addEventListener('click', () => setAdminView('home'));
+  els.refreshProductionStatusBtn.addEventListener('click', () =>
+    loadProductionStatus(true),
+  );
   els.runBackupNowBtn.addEventListener('click', runBackupNow);
   els.sendTestEmailBtn.addEventListener('click', sendTestEmail);
+  els.refreshOpenClawIntegrationBtn.addEventListener('click', () =>
+    loadOpenClawIntegration(true),
+  );
+  els.rotateOpenClawTokenBtn.addEventListener('click', rotateOpenClawToken);
+  els.revokeOpenClawBtn.addEventListener('click', revokeOpenClawIntegration);
+  els.refreshWhatsappIntegrationBtn.addEventListener('click', () =>
+    loadWhatsappIntegration(true),
+  );
+  els.saveWhatsappIntegrationBtn.addEventListener('click', saveWhatsappIntegration);
+  els.sendWhatsappTestBtn.addEventListener('click', sendWhatsappTestMessage);
   els.refreshBackupStatusBtn.addEventListener('click', () =>
     loadBackupStatus(true),
   );
@@ -4802,6 +5308,9 @@ function bindEvents() {
     loadAdminSchedule();
   });
   els.adminScheduleDateInput.addEventListener('change', () => renderAdminSchedule());
+  els.adminScheduleTypeSelect.addEventListener('change', () =>
+    syncAdminSchedulePlannedTimeControls(),
+  );
   els.adminScheduleCalendar.addEventListener('click', (event) => {
     const day = event.target.closest('[data-date]');
     if (!day) return;

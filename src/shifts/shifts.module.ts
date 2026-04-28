@@ -8,5 +8,6 @@ import { UsersModule } from '../users/users.module';
   imports: [PrismaModule, UsersModule],
   controllers: [ShiftsController],
   providers: [ShiftsService],
+  exports: [ShiftsService],
 })
 export class ShiftsModule {}

@@ -45,6 +45,40 @@ enum AuditAction {
   USER_INTERNSHIP_HOURS_UPDATED
 }
 
+enum AgentProvider {
+  OPENCLAW
+}
+
+enum WhatsappProvider {
+  META_CLOUD_API
+}
+
+enum WhatsappMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsappMessageStatus {
+  RECEIVED
+  PROCESSED
+  SENT
+  FAILED
+  IGNORED
+}
+
+enum WhatsappClockAction {
+  CLOCK_IN
+  CLOCK_OUT
+}
+
+enum WhatsappClockSessionStatus {
+  PENDING_LOCATION
+  COMPLETED
+  EXPIRED
+  CANCELLED
+  FAILED
+}
+
 model Company {
   id           String   @id @default(uuid())
   code         String   @unique
@@ -58,25 +92,72 @@ model Company {
   postalCode   String?
   createdAt    DateTime @default(now())
 
-  users      User[]
-  workplaces Workplace[]
-  holidays   Holiday[]
+  users                 User[]
+  workplaces            Workplace[]
+  holidays              Holiday[]
+  agentIntegrations     AgentIntegration[]
+  agentAccessLogs       AgentAccessLog[]
+  whatsappIntegrations  WhatsappIntegration[]
+  whatsappMessageLogs   WhatsappMessageLog[]
+  whatsappClockSessions WhatsappClockSession[]
+}
+
+model AgentIntegration {
+  id           String           @id @default(uuid())
+  companyId    String
+  company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider     AgentProvider    @default(OPENCLAW)
+  isEnabled    Boolean          @default(true)
+  tokenHash    String?          @unique
+  tokenPreview String?
+  scopes       String[]         @default([])
+  lastUsedAt   DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  accessLogs   AgentAccessLog[]
+
+  @@unique([companyId, provider])
+  @@index([companyId, isEnabled])
+}
+
+model AgentAccessLog {
+  id String @id @default(uuid())
+
+  integrationId String?
+  integration   AgentIntegration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  provider  AgentProvider?
+  status    String
+  reason    String?
+  method    String
+  path      String
+  ip        String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([integrationId, createdAt])
+  @@index([status, createdAt])
 }
 
 model AdminActivationKey {
-  id             String   @id @default(uuid())
-  keyHash        String   @unique
-  companyCode    String
-  companyName    String
-  companyLogoUrl String?
-  adminEmail     String
-  adminName      String?
-  expiresAt      DateTime
-  usedAt         DateTime?
+  id              String    @id @default(uuid())
+  keyHash         String    @unique
+  companyCode     String
+  companyName     String
+  companyLogoUrl  String?
+  adminEmail      String
+  adminName       String?
+  expiresAt       DateTime
+  usedAt          DateTime?
   createdByUserId String?
   usedByUserId    String?
   companyId       String?
-  createdAt      DateTime @default(now())
+  createdAt       DateTime  @default(now())
 
   @@index([companyCode])
   @@index([adminEmail])
@@ -84,62 +165,143 @@ model AdminActivationKey {
 }
 
 model User {
-  id          String   @id @default(uuid())
-  firebaseUid String   @unique
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  email       String?
-  name        String?
-  phone       String?
-  birthDate   DateTime?
-  role        Role     @default(EMPLOYEE)
-  workerGroup WorkerGroup @default(EMPLOYEE)
-  internshipTotalHours Int?
-  vacationAllowanceDays Float?
-  overtimeBankMinutesAdjustment Int @default(0)
-  createdAt   DateTime @default(now())
+  id                            String      @id @default(uuid())
+  firebaseUid                   String      @unique
+  companyId                     String
+  company                       Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  email                         String?
+  name                          String?
+  phone                         String?
+  birthDate                     DateTime?
+  role                          Role        @default(EMPLOYEE)
+  workerGroup                   WorkerGroup @default(EMPLOYEE)
+  internshipTotalHours          Int?
+  vacationAllowanceDays         Float?
+  overtimeBankMinutesAdjustment Int         @default(0)
+  createdAt                     DateTime    @default(now())
 
-  shifts           Shift[]
-  scheduleEntries  ScheduleEntry[]
+  shifts                  Shift[]
+  scheduleEntries         ScheduleEntry[]
   scheduleTemplateEntries ScheduleTemplateEntry[]
-  requests         Request[]  @relation("RequestOwner")
-  reviewedRequests Request[]  @relation("RequestReviewer")
-  documents        Document[]
-  notifications    Notification[]
-  auditLogsAsActor  AuditLog[] @relation("AuditActor")
-  auditLogsAsTarget AuditLog[] @relation("AuditTarget")
+  requests                Request[]               @relation("RequestOwner")
+  reviewedRequests        Request[]               @relation("RequestReviewer")
+  documents               Document[]
+  notifications           Notification[]
+  auditLogsAsActor        AuditLog[]              @relation("AuditActor")
+  auditLogsAsTarget       AuditLog[]              @relation("AuditTarget")
+  whatsappMessageLogs     WhatsappMessageLog[]
+  whatsappClockSessions   WhatsappClockSession[]
 
   @@index([companyId, role])
 }
 
-model Shift {
-  id     String @id @default(uuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workplaceId String?
-  workplace Workplace? @relation(fields: [workplaceId], references: [id], onDelete: SetNull)
+model WhatsappIntegration {
+  id                 String                 @id @default(uuid())
+  companyId          String
+  company            Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider           WhatsappProvider       @default(META_CLOUD_API)
+  isEnabled          Boolean                @default(false)
+  displayPhoneNumber String?
+  phoneNumberId      String?                @unique
+  businessAccountId  String?
+  allowClockIn       Boolean                @default(true)
+  allowClockOut      Boolean                @default(true)
+  requireLocation    Boolean                @default(true)
+  lastInboundAt      DateTime?
+  lastOutboundAt     DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  messageLogs        WhatsappMessageLog[]
+  clockSessions      WhatsappClockSession[]
 
-  startAt              DateTime
-  endAt                DateTime?
-  startLat             Float?
-  startLng             Float?
-  startAddress         String?
-  endLat               Float?
-  endLng               Float?
-  endAddress           String?
-  accuracy             Float?
-  startDistanceMeters  Float?
-  endDistanceMeters    Float?
-  startInsideGeofence  Boolean?
-  endInsideGeofence    Boolean?
-  riskScore            Int      @default(0)
-  riskReasons          Json?
-  isSuspicious         Boolean  @default(false)
-  startIp              String?
-  endIp                String?
-  startUserAgent       String?
-  endUserAgent         String?
-  createdAt            DateTime @default(now())
+  @@unique([companyId, provider])
+  @@index([companyId, isEnabled])
+}
+
+model WhatsappMessageLog {
+  id                String                   @id @default(uuid())
+  integrationId     String?
+  integration       WhatsappIntegration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  companyId         String?
+  company           Company?                 @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  userId            String?
+  user              User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  direction         WhatsappMessageDirection
+  status            WhatsappMessageStatus
+  messageType       String?
+  command           String?
+  body              String?
+  fromPhone         String?
+  toPhone           String?
+  providerMessageId String?
+  payload           Json?
+  errorMessage      String?
+  createdAt         DateTime                 @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([integrationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model WhatsappClockSession {
+  id                   String                     @id @default(uuid())
+  integrationId        String?
+  integration          WhatsappIntegration?       @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  companyId            String
+  company              Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone                String
+  action               WhatsappClockAction
+  status               WhatsappClockSessionStatus @default(PENDING_LOCATION)
+  requestedWorkplaceId String?
+  shiftId              String?
+  locationLat          Float?
+  locationLng          Float?
+  locationAccuracy     Float?
+  locationAddress      String?
+  providerMessageId    String?
+  requestedAt          DateTime                   @default(now())
+  expiresAt            DateTime
+  completedAt          DateTime?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+
+  @@index([companyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, expiresAt])
+  @@index([phone, createdAt])
+}
+
+model Shift {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workplaceId String?
+  workplace   Workplace? @relation(fields: [workplaceId], references: [id], onDelete: SetNull)
+
+  startAt             DateTime
+  endAt               DateTime?
+  startLat            Float?
+  startLng            Float?
+  startAddress        String?
+  endLat              Float?
+  endLng              Float?
+  endAddress          String?
+  accuracy            Float?
+  startDistanceMeters Float?
+  endDistanceMeters   Float?
+  startInsideGeofence Boolean?
+  endInsideGeofence   Boolean?
+  riskScore           Int       @default(0)
+  riskReasons         Json?
+  isSuspicious        Boolean   @default(false)
+  startIp             String?
+  endIp               String?
+  startUserAgent      String?
+  endUserAgent        String?
+  createdAt           DateTime  @default(now())
 
   @@index([userId, startAt])
   @@index([isSuspicious, startAt])
@@ -258,9 +420,9 @@ model Request {
   endAt   DateTime
   comment String?
 
-  reviewedAt   DateTime?
-  reviewedById String?
-  reviewedBy   User?     @relation("RequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt    DateTime?
+  reviewedById  String?
+  reviewedBy    User?     @relation("RequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   reviewComment String?
 
   createdAt DateTime @default(now())
@@ -303,30 +465,30 @@ model Document {
 }
 
 model Notification {
-  id      String           @id @default(uuid())
-  userId  String
-  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type    NotificationType
-  scopeKey String          @default("GLOBAL")
-  message String
-  meta    Json?
+  id       String           @id @default(uuid())
+  userId   String
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type     NotificationType
+  scopeKey String           @default("GLOBAL")
+  message  String
+  meta     Json?
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   readAt    DateTime?
 
+  @@unique([userId, type, scopeKey])
   @@index([userId, createdAt])
   @@index([userId, type, readAt])
-  @@unique([userId, type, scopeKey])
 }
 
 model AuditLog {
   id String @id @default(uuid())
 
   actorUserId String?
-  actorUser   User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorUser   User?   @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
   targetUserId String?
-  targetUser   User? @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetUser   User?   @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
 
   action AuditAction
   meta   Json?

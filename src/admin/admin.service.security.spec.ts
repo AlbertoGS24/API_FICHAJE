@@ -3,6 +3,7 @@ import { AdminService } from './admin.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleService } from '../schedule/schedule.service';
 import { MailService } from '../mail/mail.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 type MockFn = jest.Mock<any, any>;
 
@@ -60,6 +61,12 @@ function createMailMock() {
   };
 }
 
+function createWhatsappMock() {
+  return {
+    sendReviewedRequestNotification: jest.fn(),
+  };
+}
+
 function mockAdmin(prisma: ReturnType<typeof createPrismaMock>['prisma']) {
   (prisma.user.findUnique as MockFn).mockResolvedValue({
     id: 'admin-1',
@@ -75,12 +82,14 @@ describe('AdminService Security (multiempresa)', () => {
     const { prisma } = createPrismaMock();
     const schedule = createScheduleMock();
     const mail = createMailMock();
+    const whatsapp = createWhatsappMock();
     mockAdmin(prisma);
     (prisma.request.findMany as MockFn).mockResolvedValue([]);
     const service = new AdminService(
       prisma as unknown as PrismaService,
       schedule as unknown as ScheduleService,
       mail as unknown as MailService,
+      whatsapp as unknown as WhatsappService,
     );
 
     await service.getRequests('uid-admin-a', 'PENDING', 'VACATION', 'EMPLOYEE');
@@ -101,12 +110,14 @@ describe('AdminService Security (multiempresa)', () => {
     const { prisma } = createPrismaMock();
     const schedule = createScheduleMock();
     const mail = createMailMock();
+    const whatsapp = createWhatsappMock();
     mockAdmin(prisma);
     (prisma.user.findFirst as MockFn).mockResolvedValue(null);
     const service = new AdminService(
       prisma as unknown as PrismaService,
       schedule as unknown as ScheduleService,
       mail as unknown as MailService,
+      whatsapp as unknown as WhatsappService,
     );
 
     await expect(
@@ -120,6 +131,7 @@ describe('AdminService Security (multiempresa)', () => {
     const { prisma, tx } = createPrismaMock();
     const schedule = createScheduleMock();
     const mail = createMailMock();
+    const whatsapp = createWhatsappMock();
     mockAdmin(prisma);
     (prisma.user.findFirst as MockFn).mockResolvedValue({
       id: 'user-1',
@@ -143,6 +155,7 @@ describe('AdminService Security (multiempresa)', () => {
       prisma as unknown as PrismaService,
       schedule as unknown as ScheduleService,
       mail as unknown as MailService,
+      whatsapp as unknown as WhatsappService,
     );
 
     await service.updateUserSettings('uid-admin-a', 'user-1', {
@@ -161,6 +174,7 @@ describe('AdminService Security (multiempresa)', () => {
     const { prisma } = createPrismaMock();
     const schedule = createScheduleMock();
     const mail = createMailMock();
+    const whatsapp = createWhatsappMock();
     mockAdmin(prisma);
     (prisma.request.findFirst as MockFn)
       .mockResolvedValueOnce({ id: 'req-1', userId: 'user-1' })
@@ -174,6 +188,7 @@ describe('AdminService Security (multiempresa)', () => {
       prisma as unknown as PrismaService,
       schedule as unknown as ScheduleService,
       mail as unknown as MailService,
+      whatsapp as unknown as WhatsappService,
     );
 
     await service.approveRequest('uid-admin-a', 'req-1', {
@@ -191,6 +206,7 @@ describe('AdminService Security (multiempresa)', () => {
     const { prisma } = createPrismaMock();
     const schedule = createScheduleMock();
     const mail = createMailMock();
+    const whatsapp = createWhatsappMock();
     mockAdmin(prisma);
     (prisma.shift.findMany as MockFn).mockResolvedValue([
       {
@@ -224,6 +240,7 @@ describe('AdminService Security (multiempresa)', () => {
       prisma as unknown as PrismaService,
       schedule as unknown as ScheduleService,
       mail as unknown as MailService,
+      whatsapp as unknown as WhatsappService,
     );
 
     const result = await service.suspiciousShifts(
@@ -248,12 +265,14 @@ describe('AdminService Security (multiempresa)', () => {
     const { prisma } = createPrismaMock();
     const schedule = createScheduleMock();
     const mail = createMailMock();
+    const whatsapp = createWhatsappMock();
     mockAdmin(prisma);
     (prisma.workplace.findMany as MockFn).mockResolvedValue([]);
     const service = new AdminService(
       prisma as unknown as PrismaService,
       schedule as unknown as ScheduleService,
       mail as unknown as MailService,
+      whatsapp as unknown as WhatsappService,
     );
 
     await service.listWorkplaces('uid-admin-a');

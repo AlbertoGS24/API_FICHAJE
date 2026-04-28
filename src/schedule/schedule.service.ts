@@ -73,6 +73,16 @@ function timeToMinutes(value: string) {
   return hours * 60 + minutes;
 }
 
+function minutesToDurationLabel(minutes: number | null) {
+  if (minutes == null) return null;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (!hours) return `${remainingMinutes} min`;
+  if (!remainingMinutes) return `${hours} h`;
+  return `${hours} h ${remainingMinutes} min`;
+}
+
 function formatMonthDay(date: DateTime, monthBase: DateTime) {
   const target = monthBase.set({ day: date.day }).startOf('day');
   if (!target.isValid || target.month !== monthBase.month) {
@@ -83,6 +93,12 @@ function formatMonthDay(date: DateTime, monthBase: DateTime) {
 
 function dateKeyFor(date: Date) {
   return DateTime.fromJSDate(date).setZone(APP_TIMEZONE).toFormat('yyyy-LL-dd');
+}
+
+function plannedMinutesFor(startTime: string | null, endTime: string | null) {
+  if (!startTime || !endTime) return null;
+  const minutes = timeToMinutes(endTime) - timeToMinutes(startTime);
+  return minutes > 0 ? minutes : null;
 }
 
 @Injectable()
@@ -145,6 +161,7 @@ export class ScheduleService {
     const dateKey = DateTime.fromJSDate(entry.date)
       .setZone(APP_TIMEZONE)
       .toFormat('yyyy-LL-dd');
+    const plannedMinutes = plannedMinutesFor(entry.startTime, entry.endTime);
 
     return {
       id: entry.id,
@@ -153,6 +170,10 @@ export class ScheduleService {
       type: entry.type,
       startTime: entry.startTime,
       endTime: entry.endTime,
+      plannedStartTime: entry.startTime,
+      plannedEndTime: entry.endTime,
+      plannedMinutes,
+      plannedDurationLabel: minutesToDurationLabel(plannedMinutes),
       notes: entry.notes,
     };
   }
@@ -239,20 +260,37 @@ export class ScheduleService {
     endTime: string | null;
     notes: string | null;
   }) {
+    const plannedMinutes = plannedMinutesFor(entry.startTime, entry.endTime);
+
     return {
       id: entry.id,
       weekday: entry.weekday,
       type: entry.type,
       startTime: entry.startTime,
       endTime: entry.endTime,
+      plannedStartTime: entry.startTime,
+      plannedEndTime: entry.endTime,
+      plannedMinutes,
+      plannedDurationLabel: minutesToDurationLabel(plannedMinutes),
       notes: entry.notes,
     };
   }
 
-  private validateWorkTimes(startTime?: string, endTime?: string) {
+  private normalizePlannedTimes(input: {
+    type: 'WORK' | 'VACATION' | 'SICK_LEAVE' | 'DAY_OFF' | 'HOLIDAY';
+    startTime?: string;
+    endTime?: string;
+  }) {
+    const startTime = normalizeOptionalText(input.startTime);
+    const endTime = normalizeOptionalText(input.endTime);
+
+    if (input.type !== 'WORK') {
+      return { startTime: null, endTime: null };
+    }
+
     if (!!startTime !== !!endTime) {
       throw new BadRequestException(
-        'Debes indicar hora de inicio y fin, o dejar ambas vacías',
+        'Debes indicar hora prevista de entrada y salida, o dejar ambas vacías',
       );
     }
 
@@ -262,9 +300,11 @@ export class ScheduleService {
       timeToMinutes(endTime) <= timeToMinutes(startTime)
     ) {
       throw new BadRequestException(
-        'La hora de fin debe ser posterior a la hora de inicio',
+        'La hora prevista de salida debe ser posterior a la hora prevista de entrada',
       );
     }
+
+    return { startTime, endTime };
   }
 
   private async upsertScheduleEntry(input: {
@@ -275,6 +315,12 @@ export class ScheduleService {
     endTime?: string;
     notes?: string | null;
   }) {
+    const plannedTimes = this.normalizePlannedTimes({
+      type: input.type,
+      startTime: input.startTime,
+      endTime: input.endTime,
+    });
+
     return this.prisma.scheduleEntry.upsert({
       where: {
         userId_date: {
@@ -284,16 +330,16 @@ export class ScheduleService {
       },
       update: {
         type: input.type,
-        startTime: input.startTime ?? null,
-        endTime: input.endTime ?? null,
+        startTime: plannedTimes.startTime,
+        endTime: plannedTimes.endTime,
         notes: normalizeOptionalText(input.notes),
       },
       create: {
         userId: input.userId,
         date: input.date.toUTC().toJSDate(),
         type: input.type,
-        startTime: input.startTime ?? null,
-        endTime: input.endTime ?? null,
+        startTime: plannedTimes.startTime,
+        endTime: plannedTimes.endTime,
         notes: normalizeOptionalText(input.notes),
       },
     });
@@ -394,8 +440,6 @@ export class ScheduleService {
       dto.userId,
     );
 
-    this.validateWorkTimes(dto.startTime, dto.endTime);
-
     const date = parseScheduleDate(dto.date);
     const entry = await this.upsertScheduleEntry({
       userId: targetUser.id,
@@ -431,8 +475,6 @@ export class ScheduleService {
     if (toDate.diff(fromDate, 'days').days > 370) {
       throw new BadRequestException('El rango máximo permitido es de 12 meses');
     }
-
-    this.validateWorkTimes(dto.startTime, dto.endTime);
 
     let affected = 0;
     let cursor = fromDate;
@@ -501,7 +543,11 @@ export class ScheduleService {
     );
     const weekdays = normalizeWeekdays(dto.weekdays);
 
-    this.validateWorkTimes(dto.startTime, dto.endTime);
+    const plannedTimes = this.normalizePlannedTimes({
+      type: dto.type,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+    });
 
     for (const weekday of weekdays) {
       await this.prisma.scheduleTemplateEntry.upsert({
@@ -513,16 +559,16 @@ export class ScheduleService {
         },
         update: {
           type: dto.type,
-          startTime: dto.startTime ?? null,
-          endTime: dto.endTime ?? null,
+          startTime: plannedTimes.startTime,
+          endTime: plannedTimes.endTime,
           notes: normalizeOptionalText(dto.notes),
         },
         create: {
           userId: targetUser.id,
           weekday,
           type: dto.type,
-          startTime: dto.startTime ?? null,
-          endTime: dto.endTime ?? null,
+          startTime: plannedTimes.startTime,
+          endTime: plannedTimes.endTime,
           notes: normalizeOptionalText(dto.notes),
         },
       });

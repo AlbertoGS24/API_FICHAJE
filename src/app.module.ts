@@ -14,6 +14,8 @@ import { DocumentsModule } from './documents/documents.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { ScheduleModule } from './schedule/schedule.module';
+import { AgentModule } from './agent/agent.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { ScheduleModule } from './schedule/schedule.module';
     NotificationsModule,
     OnboardingModule,
     ScheduleModule,
+    AgentModule,
+    WhatsappModule,
   ],
   controllers: [AppController],
   providers: [AppService],

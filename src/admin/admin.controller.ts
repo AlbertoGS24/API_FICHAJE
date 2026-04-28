@@ -39,6 +39,7 @@ import { UpdateCompanyLocationDto } from './dto/update-company-location.dto';
 import { CreateHolidayDto, UpdateHolidayDto } from './dto/upsert-holiday.dto';
 import { ImportOfficialHolidaysDto } from './dto/import-official-holidays.dto';
 import { SendTestEmailDto } from './dto/send-test-email.dto';
+import { RotateOpenClawTokenDto } from './dto/openclaw-integration.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -103,6 +104,11 @@ export class AdminController {
     return this.adminService.getBackupStatus(req.user.uid);
   }
 
+  @Get('system/production-status')
+  getProductionStatus(@Req() req: RequestWithUser) {
+    return this.adminService.getProductionStatus(req.user.uid);
+  }
+
   @Post('system/backup')
   runBackupNow(@Req() req: RequestWithUser) {
     return this.adminService.runBackupNow(req.user.uid);
@@ -111,6 +117,33 @@ export class AdminController {
   @Post('system/test-email')
   sendTestEmail(@Req() req: RequestWithUser, @Body() dto: SendTestEmailDto) {
     return this.adminService.sendTestEmail(req.user.uid, dto);
+  }
+
+  @Get('integrations/openclaw')
+  getOpenClawIntegration(@Req() req: RequestWithUser) {
+    return this.adminService.getOpenClawIntegration(req.user.uid);
+  }
+
+  @ApiQuery({ name: 'limit', required: false, example: '30' })
+  @Get('integrations/openclaw/access-logs')
+  getOpenClawAccessLogs(
+    @Req() req: RequestWithUser,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getOpenClawAccessLogs(req.user.uid, limit);
+  }
+
+  @Post('integrations/openclaw/token')
+  rotateOpenClawToken(
+    @Req() req: RequestWithUser,
+    @Body() dto: RotateOpenClawTokenDto,
+  ) {
+    return this.adminService.rotateOpenClawToken(req.user.uid, dto);
+  }
+
+  @Post('integrations/openclaw/revoke')
+  revokeOpenClawIntegration(@Req() req: RequestWithUser) {
+    return this.adminService.revokeOpenClawIntegration(req.user.uid);
   }
 
   @Get('workplace')

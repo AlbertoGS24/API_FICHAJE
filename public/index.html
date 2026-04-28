@@ -70,33 +70,37 @@
         </p>
       </div>
 
-      <h3 style="margin: 14px 0 6px;">Activar empresa</h3>
-      <p class="muted tiny" style="margin-top: 0;">
-        Usa el código de activación de un solo uso que se entrega tras validar el alta de la empresa.
-      </p>
-      <div class="grid two">
+      <div class="auth-subsection auth-subsection-highlight">
+        <h3>Activar empresa</h3>
+        <p class="muted tiny">
+          Usa el código de activación de un solo uso que se entrega tras validar el alta de la empresa.
+        </p>
+        <div class="grid two">
+          <label class="field">
+            Clave de activación
+            <input id="activationKeyInput" type="text" placeholder="ACT-XXXX-XXXX-XXXX" />
+          </label>
+          <label class="field">
+            Email del administrador
+            <input id="activationEmailInput" type="email" placeholder="admin@empresa.com" required />
+          </label>
+        </div>
         <label class="field">
-          Clave de activación
-          <input id="activationKeyInput" type="text" placeholder="ACT-XXXX-XXXX-XXXX" />
+          Nombre administrador
+          <input id="activationNameInput" type="text" placeholder="Nombre y apellidos" required />
         </label>
-        <label class="field">
-          Email del administrador
-          <input id="activationEmailInput" type="email" placeholder="admin@empresa.com" required />
-        </label>
+        <div id="activateAdminCaptchaWrap" class="captcha-wrap" hidden>
+          <p class="muted tiny captcha-help">Verificación anti-bots</p>
+          <div id="activateAdminCaptcha"></div>
+        </div>
+        <div class="auth-actions">
+          <button class="btn ghost" id="activateAdminBtn">Activar empresa</button>
+        </div>
       </div>
-      <label class="field">
-        Nombre administrador
-        <input id="activationNameInput" type="text" placeholder="Nombre y apellidos" required />
-      </label>
-      <div id="activateAdminCaptchaWrap" class="captcha-wrap" hidden>
-        <p class="muted tiny captcha-help">Verificación anti-bots</p>
-        <div id="activateAdminCaptcha"></div>
-      </div>
-      <button class="btn ghost" id="activateAdminBtn">Activar empresa</button>
 
-      <div id="selfRegisterSection">
-        <h3 style="margin: 14px 0 6px;">Registro directo de empresa</h3>
-        <p class="muted tiny" style="margin-top: 0;">
+      <div id="selfRegisterSection" class="auth-subsection">
+        <h3>Registro directo de empresa</h3>
+        <p class="muted tiny">
           Este bloque solo debe habilitarse si quieres permitir altas públicas directas.
         </p>
         <div class="grid two">
@@ -127,7 +131,9 @@
           <p class="muted tiny captcha-help">Verificación anti-bots</p>
           <div id="selfRegisterCaptcha"></div>
         </div>
-        <button class="btn ghost" id="selfRegisterCompanyBtn">Registrar empresa y administrador</button>
+        <div class="auth-actions">
+          <button class="btn ghost" id="selfRegisterCompanyBtn">Registrar empresa y administrador</button>
+        </div>
       </div>
 
       <details class="advanced" id="devToolsSection" hidden>
@@ -558,6 +564,11 @@
             <strong>Alta de empresas</strong>
             <p>Claves de activación para nuevos administradores y empresas.</p>
           </button>
+          <button class="admin-hub-card" type="button" data-admin-view-target="integraciones">
+            <span class="eyebrow">Integraciones</span>
+            <strong>OpenClaw y WhatsApp</strong>
+            <p>Agentes externos y mensajería por empresa desde el panel admin.</p>
+          </button>
           <button class="admin-hub-card" type="button" data-admin-view-target="auditoria">
             <span class="eyebrow">Control</span>
             <strong>Auditoría</strong>
@@ -605,6 +616,50 @@
         </div>
 
         <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <div class="card-head">
+            <div>
+              <h3 style="margin: 0 0 8px;">Estado de producción</h3>
+              <p class="muted tiny" style="margin: 0;">
+                Revisión rápida de configuración antes de desplegar. No muestra claves ni secretos.
+              </p>
+            </div>
+            <button class="btn ghost" id="refreshProductionStatusBtn">Revisar estado</button>
+          </div>
+          <div class="grid four stats production-summary">
+            <article>
+              <p>Resultado</p>
+              <strong id="productionOverallLabel">-</strong>
+            </article>
+            <article>
+              <p>Correctos</p>
+              <strong id="productionOkLabel">0</strong>
+            </article>
+            <article>
+              <p>A revisar</p>
+              <strong id="productionWarningLabel">0</strong>
+            </article>
+            <article>
+              <p>Pendientes</p>
+              <strong id="productionPendingLabel">0</strong>
+            </article>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Comprobación</th>
+                  <th>Estado</th>
+                  <th>Detalle</th>
+                </tr>
+              </thead>
+              <tbody id="productionStatusBody">
+                <tr><td colspan="3">Pulsa revisar estado para comprobar la configuración.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
           <h3 style="margin: 0 0 8px;">Copias de seguridad</h3>
           <p class="muted tiny" style="margin-top: 0;">
             Puedes lanzar un backup manual y el sistema genera otro automático cada 24 horas.
@@ -642,6 +697,167 @@
           </div>
           <div class="row">
             <button class="btn" id="sendTestEmailBtn">Enviar correo de prueba</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Integración OpenClaw</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Genera un token único para esta empresa. El token solo se muestra una vez y en la base de datos se guarda hasheado.
+          </p>
+          <div class="grid three">
+            <article class="stat-card">
+              <p>Estado</p>
+              <strong id="openClawEnabledLabel">-</strong>
+            </article>
+            <article class="stat-card">
+              <p>Token</p>
+              <strong id="openClawTokenPreviewLabel">-</strong>
+            </article>
+            <article class="stat-card">
+              <p>Último uso</p>
+              <strong id="openClawLastUsedLabel">-</strong>
+            </article>
+          </div>
+          <div class="openclaw-permissions">
+            <strong>Qué podrá consultar OpenClaw</strong>
+            <p class="muted tiny" style="margin: 4px 0 0;">
+              Marca solo la información que quieres permitir a esta integración externa.
+            </p>
+            <div class="openclaw-scope-grid">
+              <label class="scope-card">
+                <input class="openclaw-scope-input" type="checkbox" value="read:summary" checked />
+                <span>
+                  <strong>Resumen general</strong>
+                  <small>Empleados, turnos abiertos, solicitudes y alertas.</small>
+                </span>
+              </label>
+              <label class="scope-card">
+                <input class="openclaw-scope-input" type="checkbox" value="read:requests" checked />
+                <span>
+                  <strong>Solicitudes</strong>
+                  <small>Vacaciones, horas extra y solicitudes pendientes.</small>
+                </span>
+              </label>
+              <label class="scope-card">
+                <input class="openclaw-scope-input" type="checkbox" value="read:shifts" checked />
+                <span>
+                  <strong>Fichajes</strong>
+                  <small>Historial diario de entradas y salidas.</small>
+                </span>
+              </label>
+              <label class="scope-card">
+                <input class="openclaw-scope-input" type="checkbox" value="read:schedule" checked />
+                <span>
+                  <strong>Cuadrantes</strong>
+                  <small>Planificación mensual y horas previstas.</small>
+                </span>
+              </label>
+            </div>
+          </div>
+          <pre id="openClawTokenOutput" class="token-output" hidden></pre>
+	          <div class="row">
+	            <button class="btn ghost" id="refreshOpenClawIntegrationBtn">Actualizar integración</button>
+	            <button class="btn" id="rotateOpenClawTokenBtn">Generar / rotar token</button>
+	            <button class="btn ghost danger" id="revokeOpenClawBtn">Revocar token</button>
+	          </div>
+	          <h4 style="margin: 18px 0 8px;">Últimos accesos OpenClaw</h4>
+	          <div class="table-wrap">
+	            <table>
+	              <thead>
+	                <tr>
+	                  <th>Fecha</th>
+	                  <th>Estado</th>
+	                  <th>Ruta</th>
+	                  <th>Motivo</th>
+	                  <th>IP</th>
+	                </tr>
+	              </thead>
+	              <tbody id="openClawAccessLogBody">
+	                <tr><td colspan="5">Sin accesos registrados.</td></tr>
+	              </tbody>
+	            </table>
+	          </div>
+	        </div>
+
+        <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+          <h3 style="margin: 0 0 8px;">Integración WhatsApp Business</h3>
+          <p class="muted tiny" style="margin-top: 0;">
+            Configura el número de empresa para notificaciones, bot conversacional y fichaje por WhatsApp.
+          </p>
+          <div class="grid four stats">
+            <article class="stat-card">
+              <p>Estado</p>
+              <strong id="whatsappStatusLabel">-</strong>
+            </article>
+            <article class="stat-card">
+              <p>Proveedor</p>
+              <strong id="whatsappProviderReadyLabel">-</strong>
+            </article>
+            <article class="stat-card">
+              <p>Última entrada</p>
+              <strong id="whatsappLastInboundLabel">-</strong>
+            </article>
+            <article class="stat-card">
+              <p>Última salida</p>
+              <strong id="whatsappLastOutboundLabel">-</strong>
+            </article>
+          </div>
+          <div class="grid two">
+            <label class="field">
+              Número visible
+              <input id="whatsappDisplayPhoneInput" type="text" placeholder="+34 600 111 222" />
+            </label>
+            <label class="field">
+              Phone Number ID (Meta)
+              <input id="whatsappPhoneNumberIdInput" type="text" placeholder="123456789012345" />
+            </label>
+            <label class="field">
+              Business Account ID
+              <input id="whatsappBusinessAccountIdInput" type="text" placeholder="WABA / Business Account ID" />
+            </label>
+          </div>
+          <div class="row" style="gap: 18px; flex-wrap: wrap; margin-top: 8px;">
+            <label><input id="whatsappEnabledInput" type="checkbox" /> Activar integración</label>
+            <label><input id="whatsappAllowClockInInput" type="checkbox" checked /> Permitir fichar entrada</label>
+            <label><input id="whatsappAllowClockOutInput" type="checkbox" checked /> Permitir fichar salida</label>
+            <label><input id="whatsappRequireLocationInput" type="checkbox" checked /> Pedir ubicación obligatoria</label>
+          </div>
+          <div class="row" style="margin-top: 12px;">
+            <button class="btn ghost" id="refreshWhatsappIntegrationBtn">Actualizar WhatsApp</button>
+            <button class="btn" id="saveWhatsappIntegrationBtn">Guardar configuración WhatsApp</button>
+          </div>
+          <h4 style="margin: 18px 0 8px;">Mensaje de prueba</h4>
+          <div class="grid two">
+            <label class="field">
+              Teléfono destino
+              <input id="whatsappTestPhoneInput" type="text" placeholder="+34600111222" />
+            </label>
+            <label class="field">
+              Mensaje
+              <input id="whatsappTestMessageInput" type="text" placeholder="Prueba de integración WhatsApp API Fichaje" />
+            </label>
+          </div>
+          <div class="row">
+            <button class="btn" id="sendWhatsappTestBtn">Enviar WhatsApp de prueba</button>
+          </div>
+          <h4 style="margin: 18px 0 8px;">Últimos mensajes WhatsApp</h4>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Dirección</th>
+                  <th>Estado</th>
+                  <th>Comando</th>
+                  <th>Usuario / teléfono</th>
+                  <th>Detalle</th>
+                </tr>
+              </thead>
+              <tbody id="whatsappLogsBody">
+                <tr><td colspan="6">Sin mensajes registrados.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -866,11 +1082,11 @@
           </div>
           <div class="grid three">
             <label class="field">
-              Inicio (opcional)
+              Entrada prevista
               <input id="adminScheduleStartTimeInput" type="time" />
             </label>
             <label class="field">
-              Fin (opcional)
+              Salida prevista
               <input id="adminScheduleEndTimeInput" type="time" />
             </label>
             <label class="field">
@@ -878,6 +1094,9 @@
               <input id="adminScheduleNotesInput" type="text" placeholder="Observaciones del día" />
             </label>
           </div>
+          <p class="muted tiny">
+            Las horas previstas se usan en días de trabajo para planificar cuándo debería fichar el empleado y comparar más adelante horario real frente a horario planificado.
+          </p>
           <div class="field">
             Aplicar solo en estos días de la semana
             <div class="row tight">

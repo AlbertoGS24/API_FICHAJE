@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
+const { Pool } = require('pg');
 require('dotenv').config();
 
 function fail(message) {
@@ -91,6 +93,17 @@ function parsePositiveInt(value, fallback) {
   return Math.trunc(n);
 }
 
+function createPrisma() {
+  const databaseUrl = (process.env.DATABASE_URL || '').trim();
+  if (!databaseUrl) fail('DATABASE_URL no está definida en .env');
+
+  const pool = new Pool({ connectionString: databaseUrl });
+  const adapter = new PrismaPg(pool);
+  const prisma = new PrismaClient({ adapter });
+
+  return { prisma, pool };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const companyCif = normalizeCompanyCif(args['company-cif']);
@@ -114,7 +127,7 @@ async function main() {
     fail('Email inválido');
   }
 
-  const prisma = new PrismaClient();
+  const { prisma, pool } = createPrisma();
   const now = new Date();
   const expiresAt = new Date(now);
   expiresAt.setUTCDate(expiresAt.getUTCDate() + expiresInDays);
@@ -169,6 +182,7 @@ async function main() {
     console.log(`Clave de activación: ${activationKey}`);
   } finally {
     await prisma.$disconnect();
+    await pool.end();
   }
 }
 

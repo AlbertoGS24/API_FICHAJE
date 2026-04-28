@@ -7,6 +7,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -23,6 +24,10 @@ export class CreateAdminUserDto {
   @IsOptional()
   @IsString()
   @MaxLength(40)
+  @Matches(/^[+\d()\s-]+$/, {
+    message:
+      'El teléfono debe estar en formato internacional, por ejemplo +34600111222',
+  })
   phone?: string;
 
   @IsOptional()

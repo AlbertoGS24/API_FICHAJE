@@ -3,6 +3,7 @@ import { AdminService } from './admin.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleService } from '../schedule/schedule.service';
 import { MailService } from '../mail/mail.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -22,6 +23,10 @@ describe('AdminService', () => {
         {
           provide: MailService,
           useValue: { sendTextEmail: jest.fn() },
+        },
+        {
+          provide: WhatsappService,
+          useValue: { sendReviewedRequestNotification: jest.fn() },
         },
       ],
     }).compile();

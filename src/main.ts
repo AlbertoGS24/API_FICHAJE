@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { createHash } from 'crypto';
 import express from 'express';
 import { join } from 'path';
 import { AppModule } from './app.module';
@@ -10,6 +11,7 @@ type RateLimitOptions = {
   scope: string;
   windowMs: number;
   max: number;
+  keyGenerator?: (req: express.Request) => string;
 };
 
 type RateLimitBucket = {
@@ -46,6 +48,15 @@ function getClientIp(req: express.Request) {
   return req.ip || req.socket.remoteAddress || 'unknown';
 }
 
+function getBearerTokenFingerprint(req: express.Request) {
+  const authHeader = req.header('authorization') ?? '';
+  const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
+  const token = match?.[1]?.trim();
+  if (!token) return `ip:${getClientIp(req)}`;
+  const fingerprint = createHash('sha256').update(token).digest('hex');
+  return `token:${fingerprint.slice(0, 24)}`;
+}
+
 function createRateLimiter(options: RateLimitOptions): express.RequestHandler {
   const buckets = new Map<string, RateLimitBucket>();
   let requestCount = 0;
@@ -61,8 +72,10 @@ function createRateLimiter(options: RateLimitOptions): express.RequestHandler {
       }
     }
 
-    const ip = getClientIp(req);
-    const key = `${options.scope}:${ip}`;
+    const keyPart = options.keyGenerator
+      ? options.keyGenerator(req)
+      : getClientIp(req);
+    const key = `${options.scope}:${keyPart}`;
     const current = buckets.get(key);
     const bucket =
       !current || current.resetAt <= now
@@ -96,6 +109,7 @@ async function bootstrap() {
   const allowedOrigins = parseAllowedOrigins();
   const globalMax = toIntEnv('RATE_LIMIT_GLOBAL_MAX', 180);
   const onboardingMax = toIntEnv('RATE_LIMIT_ONBOARDING_MAX', 12);
+  const agentMax = toIntEnv('RATE_LIMIT_AGENT_MAX', 60);
 
   const app = await NestFactory.create(AppModule);
   const expressInstance = app.getHttpAdapter().getInstance();
@@ -178,6 +192,15 @@ async function bootstrap() {
       scope: 'onboarding-activate-admin',
       windowMs: 10 * 60 * 1000,
       max: onboardingMax,
+    }),
+  );
+  app.use(
+    '/agent',
+    createRateLimiter({
+      scope: 'agent',
+      windowMs: 60 * 1000,
+      max: agentMax,
+      keyGenerator: getBearerTokenFingerprint,
     }),
   );
 

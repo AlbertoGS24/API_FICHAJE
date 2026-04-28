@@ -155,6 +155,20 @@ export class ShiftsService {
     return this.usersService.findOrCreateByFirebaseUid(firebaseUid);
   }
 
+  private async ensureUserById(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        companyId: true,
+      },
+    });
+    if (!user) {
+      throw new BadRequestException('Usuario no encontrado');
+    }
+    return user;
+  }
+
   private async ensureUserId(firebaseUid: string) {
     const user = await this.ensureUser(firebaseUid);
     return user.id;
@@ -411,6 +425,10 @@ export class ShiftsService {
 
   async getOpenShift(firebaseUid: string) {
     const userId = await this.ensureUserId(firebaseUid);
+    return this.getOpenShiftByUserId(userId);
+  }
+
+  async getOpenShiftByUserId(userId: string) {
     return this.prisma.shift.findFirst({
       where: { userId, endAt: null },
       orderBy: { startAt: 'desc' },
@@ -499,7 +517,19 @@ export class ShiftsService {
     context?: ShiftRequestContext,
   ) {
     const user = await this.ensureUser(firebaseUid);
-    const userId = user.id;
+    return this.clockInByUserId(user.id, dto, context, user.companyId);
+  }
+
+  async clockInByUserId(
+    userId: string,
+    dto?: ClockLocationDto,
+    context?: ShiftRequestContext,
+    companyIdOverride?: string,
+  ) {
+    const user =
+      companyIdOverride != null
+        ? { id: userId, companyId: companyIdOverride }
+        : await this.ensureUserById(userId);
 
     // comprobar si ya hay abierto
     const open = await this.prisma.shift.findFirst({
@@ -547,14 +577,25 @@ export class ShiftsService {
 
     return shift;
   }
-
   async clockOut(
     firebaseUid: string,
     dto?: ClockLocationDto,
     context?: ShiftRequestContext,
   ) {
     const user = await this.ensureUser(firebaseUid);
-    const userId = user.id;
+    return this.clockOutByUserId(user.id, dto, context, user.companyId);
+  }
+
+  async clockOutByUserId(
+    userId: string,
+    dto?: ClockLocationDto,
+    context?: ShiftRequestContext,
+    companyIdOverride?: string,
+  ) {
+    const user =
+      companyIdOverride != null
+        ? { id: userId, companyId: companyIdOverride }
+        : await this.ensureUserById(userId);
 
     const open = await this.prisma.shift.findFirst({
       where: { userId, endAt: null },

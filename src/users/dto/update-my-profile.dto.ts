@@ -23,7 +23,8 @@ export class UpdateMyProfileDto {
   @IsString()
   @MaxLength(30)
   @Matches(/^[+\d()\s-]+$/, {
-    message: 'El teléfono solo puede contener números, espacios y +()-',
+    message:
+      'El teléfono debe estar en formato internacional, por ejemplo +34600111222',
   })
   phone?: string;
 

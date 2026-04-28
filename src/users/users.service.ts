@@ -12,6 +12,7 @@ import {
   calculateOvertimeMinutes,
   calculateVacationDayUsage,
 } from '../shared/work-metrics';
+import { normalizeInternationalPhone } from '../shared/phone';
 
 const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
 const FALSE_VALUES = new Set(['0', 'false', 'no', 'off']);
@@ -270,6 +271,25 @@ export class UsersService {
     return profile;
   }
 
+  async findByCompanyAndPhone(companyId: string, phone: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        companyId,
+        phone,
+      },
+      select: {
+        id: true,
+        companyId: true,
+        firebaseUid: true,
+        email: true,
+        name: true,
+        phone: true,
+        role: true,
+        workerGroup: true,
+      },
+    });
+  }
+
   async updateMyProfile(firebaseUid: string, dto: UpdateMyProfileDto) {
     const user = await this.getByFirebaseUid(firebaseUid);
 
@@ -283,7 +303,23 @@ export class UsersService {
     }
 
     if (dto.phone !== undefined) {
-      data.phone = normalizeOptionalText(dto.phone);
+      const nextPhone = normalizeInternationalPhone(dto.phone);
+      if (nextPhone) {
+        const duplicatedPhone = await this.prisma.user.findFirst({
+          where: {
+            companyId: user.companyId,
+            id: { not: user.id },
+            phone: nextPhone,
+          },
+          select: { id: true },
+        });
+        if (duplicatedPhone) {
+          throw new BadRequestException(
+            'Ya existe otro usuario con ese teléfono',
+          );
+        }
+      }
+      data.phone = nextPhone;
     }
 
     if (dto.birthDate !== undefined) {

@@ -27,11 +27,15 @@ export class UpsertScheduleEntryDto {
   type!: 'WORK' | 'VACATION' | 'SICK_LEAVE' | 'DAY_OFF' | 'HOLIDAY';
 
   @IsOptional()
-  @Matches(TIME_RE, { message: 'La hora de inicio debe tener formato HH:mm' })
+  @Matches(TIME_RE, {
+    message: 'La hora prevista de entrada debe tener formato HH:mm',
+  })
   startTime?: string;
 
   @IsOptional()
-  @Matches(TIME_RE, { message: 'La hora de fin debe tener formato HH:mm' })
+  @Matches(TIME_RE, {
+    message: 'La hora prevista de salida debe tener formato HH:mm',
+  })
   endTime?: string;
 
   @IsOptional()
@@ -56,11 +60,15 @@ export class BulkUpsertScheduleEntriesDto {
   type!: 'WORK' | 'VACATION' | 'SICK_LEAVE' | 'DAY_OFF' | 'HOLIDAY';
 
   @IsOptional()
-  @Matches(TIME_RE, { message: 'La hora de inicio debe tener formato HH:mm' })
+  @Matches(TIME_RE, {
+    message: 'La hora prevista de entrada debe tener formato HH:mm',
+  })
   startTime?: string;
 
   @IsOptional()
-  @Matches(TIME_RE, { message: 'La hora de fin debe tener formato HH:mm' })
+  @Matches(TIME_RE, {
+    message: 'La hora prevista de salida debe tener formato HH:mm',
+  })
   endTime?: string;
 
   @IsOptional()
@@ -85,11 +93,15 @@ export class UpsertScheduleTemplateDto {
   type!: 'WORK' | 'VACATION' | 'SICK_LEAVE' | 'DAY_OFF' | 'HOLIDAY';
 
   @IsOptional()
-  @Matches(TIME_RE, { message: 'La hora de inicio debe tener formato HH:mm' })
+  @Matches(TIME_RE, {
+    message: 'La hora prevista de entrada debe tener formato HH:mm',
+  })
   startTime?: string;
 
   @IsOptional()
-  @Matches(TIME_RE, { message: 'La hora de fin debe tener formato HH:mm' })
+  @Matches(TIME_RE, {
+    message: 'La hora prevista de salida debe tener formato HH:mm',
+  })
   endTime?: string;
 
   @IsOptional()
